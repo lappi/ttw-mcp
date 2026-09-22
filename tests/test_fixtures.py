@@ -14,6 +14,7 @@ CASES = [
     ("search_players_zero.html", "player-list"),
     ("player_walkover_loss.html", "44d227e"),
     ("player_walkover_tech.html", "23a3d0d"),
+    ("player_participant.html", "17828c3"),
 ]
 
 

@@ -5,7 +5,7 @@ import pytest
 from mcp.server.mcpserver.exceptions import ToolError, UnexpectedToolError
 
 from ttw_mcp import server
-from ttw_mcp.errors import NotFound
+from ttw_mcp.errors import NotFound, ParseError
 
 
 class StubClient:
@@ -245,3 +245,116 @@ def test_get_player_rejects_non_iso_since(stub):
     with pytest.raises(ToolError, match="matches_since"):
         server.get_player("66f1645", matches_since="13.09.2026")
     assert client.calls == []
+
+
+def test_tournament_matches_are_collected_from_participants(stub_multi, load_fixture):
+    # Страница турнира матчей не содержит — они лежат в профилях участников.
+    stub_multi(
+        {
+            "6ad412a": load_fixture("tournament.html"),
+            "1c18ed8": load_fixture("player_novice.html"),
+            "17828c3": load_fixture("player_participant.html"),
+        }
+    )
+    result = server.get_tournament_matches("6ad412a")
+    assert result["date"] == "2026-09-13"
+    assert result["participants"] == 17
+    assert all(m["date"] == "2026-09-13" for m in result["matches"])
+    # Девять матчей у каждого из двух собранных профилей, один общий.
+    assert len(result["matches"]) == 17
+    assert len(result["missing_profiles"]) == 15
+    shared = [
+        m
+        for m in result["matches"]
+        if {m["player_id"], m["opponent_id"]} == {"1c18ed8", "17828c3"}
+    ]
+    assert len(shared) == 1, "общий матч отдаётся один раз, а не дважды"
+
+
+def test_mirror_mismatch_is_loud(stub_multi, load_fixture):
+    # Один матч виден с двух сторон. Если счета не зеркальны, выбирать
+    # версию молча нельзя: это изменившаяся вёрстка или ошибка разбора.
+    broken = load_fixture("player_participant.html").replace(
+        '<td class="game-score-cell">2:1</td>'
+        '<td class="game-name-cell"><a href="/players/?id=1c18ed8">',
+        '<td class="game-score-cell">2:0</td>'
+        '<td class="game-name-cell"><a href="/players/?id=1c18ed8">',
+        1,
+    )
+    assert broken != load_fixture("player_participant.html"), "замена обязана сработать"
+    stub_multi(
+        {
+            "6ad412a": load_fixture("tournament.html"),
+            "1c18ed8": load_fixture("player_novice.html"),
+            "17828c3": broken,
+        }
+    )
+    with pytest.raises(ToolError, match="ParseError"):
+        server.get_tournament_matches("6ad412a")
+
+
+def _row(opponent_id, score_for, score_against, result, date="2026-01-18"):
+    return {
+        "date": date,
+        "opponent_id": opponent_id,
+        "score_raw": f"{score_for}:{score_against}",
+        "score_for": score_for,
+        "score_against": score_against,
+        "result": result,
+        "delta": 0.0,
+    }
+
+
+def test_reconcile_keeps_both_meetings_of_the_same_pair():
+    # Групповой этап плюс плей-офф: пара играет дважды за день. Замерено,
+    # что так бывает в шестнадцати днях у каждого из двух глубоких профилей.
+    profiles = {
+        "aaa1111": {"matches": [_row("bbb2222", 2, 0, "win"), _row("bbb2222", 1, 2, "loss")]},
+        "bbb2222": {"matches": [_row("aaa1111", 0, 2, "loss"), _row("aaa1111", 2, 1, "win")]},
+    }
+    assert len(server._reconcile_matches(profiles, "2026-01-18")) == 2
+
+
+def test_reconcile_keeps_two_identical_scores():
+    # Два матча с одинаковым счётом тоже бывают: различить их нечем,
+    # и схлопывать их в один было бы потерей матча.
+    profiles = {
+        "aaa1111": {"matches": [_row("bbb2222", 0, 3, "loss"), _row("bbb2222", 0, 3, "loss")]},
+        "bbb2222": {"matches": [_row("aaa1111", 3, 0, "win"), _row("aaa1111", 3, 0, "win")]},
+    }
+    assert len(server._reconcile_matches(profiles, "2026-01-18")) == 2
+
+
+def test_reconcile_passes_through_one_sided_rows():
+    # Профиль соперника не собран — отдаём то, что есть, и не выдумываем.
+    profiles = {"aaa1111": {"matches": [_row("bbb2222", 2, 0, "win")]}}
+    matches = server._reconcile_matches(profiles, "2026-01-18")
+    assert len(matches) == 1
+    assert matches[0]["player_id"] == "aaa1111"
+
+
+def test_reconcile_raises_when_the_two_sides_disagree():
+    profiles = {
+        "aaa1111": {"matches": [_row("bbb2222", 2, 0, "win")]},
+        "bbb2222": {"matches": [_row("aaa1111", 1, 2, "loss")]},
+    }
+    with pytest.raises(ParseError):
+        server._reconcile_matches(profiles, "2026-01-18")
+
+
+def test_reconcile_mirrors_walkovers_by_result():
+    # У технического результата партий нет, и без сверки исхода
+    # техническая победа «зеркалила» бы техническую победу.
+    win = _row("bbb2222", None, None, "walkover_win")
+    win["score_raw"] = "W:Тех"
+    loss = _row("aaa1111", None, None, "walkover_loss")
+    loss["score_raw"] = "Тех:W"
+    assert len(server._reconcile_matches({"aaa1111": {"matches": [win]}, "bbb2222": {"matches": [loss]}}, "2026-01-18")) == 1
+
+    both_win = _row("aaa1111", None, None, "walkover_win")
+    both_win["score_raw"] = "W:Тех"
+    with pytest.raises(ParseError):
+        server._reconcile_matches(
+            {"aaa1111": {"matches": [win]}, "bbb2222": {"matches": [both_win]}},
+            "2026-01-18",
+        )

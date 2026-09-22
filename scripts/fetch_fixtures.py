@@ -39,6 +39,7 @@ PAGES = [
     ("search_players_zero.html", "GET", "/players/", {"player-name": "яяяяяя"}),
     ("player_walkover_loss.html.gz", "GET", "/players/", {"id": "44d227e"}),
     ("player_walkover_tech.html.gz", "GET", "/players/", {"id": "23a3d0d"}),
+    ("player_participant.html.gz", "GET", "/players/", {"id": "17828c3"}),
 ]
 
 
