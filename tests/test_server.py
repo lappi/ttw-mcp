@@ -1,7 +1,7 @@
 import asyncio
 
 import pytest
-from mcp.server.mcpserver.exceptions import ToolError
+from mcp.server.mcpserver.exceptions import ToolError, UnexpectedToolError
 
 from ttw_mcp import server
 
@@ -128,11 +128,17 @@ def test_errors_reach_the_model_through_mcp(stub):
     async def call(name, args):
         try:
             await manager.call_tool(name, args, None)
-        except Exception as exc:  # noqa: BLE001 — нас интересует текст
-            return f"{type(exc).__name__}: {exc}"
-        return "без ошибки"
+        except Exception as exc:  # noqa: BLE001 — нас интересует сам объект
+            return exc
+        return None
 
-    message = asyncio.run(call("get_player", {"player_id": "zz"}))
-    assert "ToolError" in message
-    assert "InvalidInput" in message
-    assert "player_id" in message
+    error = asyncio.run(call("get_player", {"player_id": "zz"}))
+
+    # UnexpectedToolError наследует ToolError, а __cause__ SDK выставляет на
+    # исходное исключение в обоих случаях. Поэтому ни isinstance(error,
+    # ToolError), ни обход цепочки до TtwError ничего не различают — они
+    # проходят и на коде без _reporting. Различают ровно две вещи: что это
+    # не крах, и что подробности дошли до текста, который увидит модель.
+    assert not isinstance(error, UnexpectedToolError)
+    assert "InvalidInput" in str(error)
+    assert "player_id" in str(error)

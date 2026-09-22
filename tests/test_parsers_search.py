@@ -81,7 +81,15 @@ def test_tournament_search_empty_response():
     assert result == {"total_found": 0, "truncated": False, "tournaments": []}
 
 
+def test_no_matching_tournaments_is_empty_list():
+    # Настоящий ответ сайта на поиск без совпадений.
+    result = parse_tournament_search("<div>Никого не найдено.</div>")
+    assert result == {"total_found": 0, "truncated": False, "tournaments": []}
+
+
 def test_retired_ajax_action_raises():
-    # admin-ajax отдаёт "0" на переименованное действие.
+    # admin-ajax отвечает "0" на несуществующее действие. Отличить это от
+    # пустой выдачи обязательно: иначе отключённый эндпоинт читался бы как
+    # «турниров нет», и модель сделала бы уверенный неверный вывод.
     with pytest.raises(ParseError):
         parse_tournament_search("0")

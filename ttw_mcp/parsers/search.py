@@ -23,6 +23,8 @@ TOURNAMENT_SEARCH_CAP = 20
 
 PARSER = "parse_player_search"
 
+_NO_RESULTS = "Никого не найдено"
+
 
 def parse_player_search(html: str, limit: int) -> dict:
     if limit < 1:
@@ -78,6 +80,11 @@ def parse_tournament_search(html: str) -> dict:
     передавать нельзя — любая ссылка с /tournaments/ в href, хоть из
     навигации, хоть из бокового блока, попала бы в результат как найденный
     турнир. Ограничение держится на вызывающей стороне, а не на коде.
+
+    Пустую выдачу сайт помечает текстом «Никого не найдено.», а на снятое
+    ajax-действие отвечает строкой «0». Первое — честный пустой список,
+    второе — ParseError: иначе отключённый эндпоинт выглядел бы как
+    «таких турниров не существует».
     """
     soup = BeautifulSoup(html, "html.parser")
     tournaments = [
@@ -85,11 +92,11 @@ def parse_tournament_search(html: str) -> dict:
         for link in soup.select("a")
         if "/tournaments/" in link.get("href", "")
     ]
-    if not tournaments and html.strip():
+    if not tournaments and html.strip() and _NO_RESULTS not in html:
         raise ParseError(
             "parse_tournament_search",
             'a[href*="/tournaments/"]',
-            f"непустой ответ без ссылок на турниры: {html.strip()[:40]!r}",
+            f"ответ без ссылок и без пометки о пустой выдаче: {html.strip()[:40]!r}",
         )
     return {
         "total_found": len(tournaments),

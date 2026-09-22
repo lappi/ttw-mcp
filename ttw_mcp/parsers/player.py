@@ -142,7 +142,9 @@ def _parse_best_wins(page) -> list[dict]:
     for row in block.select("tr"):
         tournament_cell = row.select_one("td.player-game-tournament-cell")
         if tournament_cell is not None:
-            link = tournament_cell.select_one("a")
+            link = require(
+                tournament_cell.select_one("a"), "td.player-game-tournament-cell a", PARSER
+            )
             current = {
                 "date": parse_date(text_of(tournament_cell)),
                 "tournament_id": extract_id(link["href"]),

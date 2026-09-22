@@ -115,7 +115,10 @@ def get_head_to_head(player_id: str, opponent_id: str) -> dict:
 
     Пустой matches означает, что игроки не встречались.
 
-    Техническая победа приходит с пустыми партиями, как и в get_player.
+    Матч без разборчивого счёта — техническая победа или изменившаяся
+    вёрстка — приходит с пустыми партиями и исходной записью в score_raw.
+    В отличие от get_player, здесь нет поля result, поэтому различить эти
+    два случая можно только по score_raw.
     """
     return parse_head_to_head(
         _client.get_html(
@@ -144,7 +147,7 @@ def search_tournaments(name: str = "", date: str = "") -> dict:
     """
     if not (name or "").strip() and not (date or "").strip():
         raise InvalidInput("нужен хотя бы один из аргументов: name или date")
-    if date and not _DATE.fullmatch(date):
+    if date.strip() and not _DATE.fullmatch(date.strip()):
         raise InvalidInput(f"date должен быть в формате DD.MM.YYYY, получено {date!r}")
     html = _client.post_ajax("get_tournaments_by_name", name=name, date=date)
     return parse_tournament_search(html)

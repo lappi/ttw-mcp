@@ -65,7 +65,7 @@ def parse_tournament(html: str, tournament_id: str) -> dict:
         place_cell = row.select_one("td.player-place-cell")
         if place_cell is None:
             continue
-        link = row.select_one("td.player-name-cell a")
+        link = require(row.select_one("td.player-name-cell a"), "td.player-name-cell a", PARSER)
         stat = text_of(row.select_one("td.player-stat-cell"))
         wins, losses = parse_win_loss(stat)
         standings.append(
