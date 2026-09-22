@@ -16,6 +16,7 @@ T = TypeVar("T")
 _DATE = re.compile(r"(\d{2})\.(\d{2})\.(\d{4})")
 _NUMBER = re.compile(r"[+-]?\d+(?:\.\d+)?")
 _WIN_LOSS = re.compile(r"(\d+)\s*-\s*(\d+)")
+_SCORE = re.compile(r"^(\d+):(\d+)$")
 _ID = re.compile(r"[?&]id=([0-9a-f]+)")
 
 
@@ -52,6 +53,24 @@ def parse_win_loss(text: str) -> tuple[int, int]:
     if match is None:
         raise ParseError("parse_win_loss", "В-П", f"получено {text!r}")
     return int(match.group(1)), int(match.group(2))
+
+
+def parse_score(raw: str) -> tuple[int | None, int | None, str]:
+    """Счёт матча. Техническую победу сайт пишет как "W:Тех", без партий.
+
+    Возвращает (партии за, партии против, исход). Для обычного счёта исход
+    "win" или "loss"; для технической победы — (None, None, "walkover").
+
+    Молча выбросить такой матч нельзя: он сыгран, у него есть соперник и
+    рейтинговая дельта, а модель, считающая игры по списку, недосчиталась бы
+    одной и не смогла бы об этом узнать. Встречается и в списке матчей
+    профиля, и в очных встречах, поэтому живёт здесь, а не в одном парсере.
+    """
+    match = _SCORE.match(raw)
+    if match is None:
+        return None, None, "walkover"
+    score_for, score_against = int(match.group(1)), int(match.group(2))
+    return score_for, score_against, "win" if score_for > score_against else "loss"
 
 
 def extract_id(href: str) -> str:

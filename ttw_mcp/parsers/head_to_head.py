@@ -13,6 +13,7 @@ from ttw_mcp.parsers.common import (
     parse_date,
     parse_int,
     parse_number,
+    parse_score,
     require,
     text_of,
 )
@@ -36,6 +37,12 @@ def _block(page, index: int) -> tuple[dict, dict]:
     block = blocks[index]
     left = block.select("div.compare-block-left")
     right = block.select("div.compare-block-right")
+    if len(left) < 2 or len(right) < 2:
+        raise ParseError(
+            PARSER,
+            f"div.compare-block[{index}] .compare-block-left/right",
+            "ожидались абсолютное значение и процент",
+        )
     absolute = {"player": parse_int(text_of(left[0])), "opponent": parse_int(text_of(right[0]))}
     percent = {"player": parse_int(text_of(left[1])), "opponent": parse_int(text_of(right[1]))}
     return absolute, percent
@@ -53,17 +60,43 @@ def parse_head_to_head(html: str, player_id: str, opponent_id: str) -> dict:
     wins, win_pct = _block(soup, 0)
     sets, sets_pct = _block(soup, 1)
 
+    player_name = text_of(names[0])
+    opponent_name = text_of(names[2])
+
     matches = []
     for item in soup.select("div.game-item-block"):
-        tournament_cell = item.select_one("div.game-item-tournament")
-        link = tournament_cell.select_one("a")
+        tournament_cell = require(
+            item.select_one("div.game-item-tournament"),
+            "div.game-item-tournament",
+            PARSER,
+        )
+        link = require(
+            tournament_cell.select_one("a"), "div.game-item-tournament a", PARSER
+        )
         details = item.select("div.game-item-details > div")
-        score_for, score_against = (int(x) for x in text_of(details[1]).split(":"))
+        if len(details) < 3:
+            raise ParseError(
+                PARSER,
+                "div.game-item-details > div",
+                "ожидались игрок, счёт и соперник",
+            )
+        # Сайт ставит слева игрока из id, справа — из with; проверено на
+        # 11 очных матчах двух разных пар. Сверяем явно: перевернись порядок
+        # однажды, счёт поменялся бы местами молча, а так парсер остановится.
+        if text_of(details[0]) != player_name:
+            raise ParseError(
+                PARSER,
+                "div.game-item-details > div:first-child",
+                f"слева ожидался {player_name!r}, получено {text_of(details[0])!r}",
+            )
+        raw_score = text_of(details[1])
+        score_for, score_against, _ = parse_score(raw_score)
         matches.append(
             {
                 "date": parse_date(text_of(tournament_cell)),
                 "tournament_id": extract_id(link["href"]),
                 "tournament_title": text_of(link),
+                "score_raw": raw_score,
                 "player_score": score_for,
                 "opponent_score": score_against,
             }
@@ -72,13 +105,13 @@ def parse_head_to_head(html: str, player_id: str, opponent_id: str) -> dict:
     return {
         "player": {
             "id": player_id,
-            "name": text_of(names[0]),
+            "name": player_name,
             "current_rating": player_rating,
             "rank": player_rank,
         },
         "opponent": {
             "id": opponent_id,
-            "name": text_of(names[2]),
+            "name": opponent_name,
             "current_rating": opponent_rating,
             "rank": opponent_rank,
         },

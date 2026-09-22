@@ -7,6 +7,7 @@ from ttw_mcp.parsers.common import (
     parse_date,
     parse_int,
     parse_number,
+    parse_score,
     parse_win_loss,
     require,
 )
@@ -45,6 +46,14 @@ def test_parse_int_strips_percent_and_spaces():
 def test_parse_win_loss_splits_pair():
     assert parse_win_loss("0-9") == (0, 9)
     assert parse_win_loss("71-27") == (71, 27)
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [("3:1", (3, 1, "win")), ("0:2", (0, 2, "loss")), ("W:Тех", (None, None, "walkover"))],
+)
+def test_parse_score_handles_walkover(raw, expected):
+    assert parse_score(raw) == expected
 
 
 @pytest.mark.parametrize(

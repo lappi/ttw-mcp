@@ -5,6 +5,7 @@ CASES = [
     ("player_veteran.html", "<игрок B>"),
     ("player_not_found.html", 'class="layout-row player-page"'),
     ("head_to_head.html", "Противостояние"),
+    ("head_to_head_walkover.html", "W:Тех"),
     ("tournament.html", "Санкт Петербург. Турнир Энерджи Арена"),
     ("search_players_two.html", "1c18ed8"),
     ("search_players_capped.html", "player-name-cell"),

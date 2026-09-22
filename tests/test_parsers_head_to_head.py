@@ -37,8 +37,24 @@ def test_mutual_matches(h2h):
     assert match["date"] == "2026-09-13"
     assert match["tournament_id"] == "6ad412a"
     assert match["tournament_title"] == "Санкт Петербург. Турнир Энерджи Арена."
+    assert match["score_raw"] == "1:2"
     assert match["player_score"] == 1
     assert match["opponent_score"] == 2
+
+
+def test_walkover_in_head_to_head_is_kept(load_fixture):
+    # <игрок B> против <игрок E>: три встречи, одна присуждена технически.
+    # Раньше int("W") здесь падал, и это была не гипотеза — страница живая.
+    h2h = parse_head_to_head(
+        load_fixture("head_to_head_walkover.html"), "66f1645", "730eb6d"
+    )
+    assert h2h["player"]["name"] == "<игрок B>"
+    assert h2h["opponent"]["name"] == "<игрок E>"
+    assert len(h2h["matches"]) == 3
+    walkovers = [m for m in h2h["matches"] if m["score_raw"] == "W:Тех"]
+    assert len(walkovers) == 1
+    assert walkovers[0]["player_score"] is None
+    assert walkovers[0]["opponent_score"] is None
 
 
 def test_broken_markup_raises_parse_error():
