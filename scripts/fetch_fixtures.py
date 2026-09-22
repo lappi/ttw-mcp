@@ -14,8 +14,10 @@ from pathlib import Path
 
 import httpx
 
+from ttw_mcp.client import TtwClient
+
 BASE = "https://r.ttw.ru"
-UA = "ttw-mcp/0.1 (+https://github.com/cryptolappi/ttw-mcp)"
+UA = TtwClient.USER_AGENT
 OUT = Path(__file__).resolve().parent.parent / "tests" / "fixtures"
 
 PAGES = [
@@ -35,6 +37,8 @@ PAGES = [
     ),
     ("head_to_head_never_met.html", "GET", "/players/", {"id": "1c18ed8", "with": "7063200"}),
     ("search_players_zero.html", "GET", "/players/", {"player-name": "яяяяяя"}),
+    ("player_walkover_loss.html.gz", "GET", "/players/", {"id": "44d227e"}),
+    ("player_walkover_tech.html.gz", "GET", "/players/", {"id": "23a3d0d"}),
 ]
 
 

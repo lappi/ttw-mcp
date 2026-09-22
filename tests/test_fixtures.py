@@ -12,6 +12,8 @@ CASES = [
     ("search_tournaments.html", "/tournaments/?id="),
     ("head_to_head_never_met.html", "Противостояние"),
     ("search_players_zero.html", "player-list"),
+    ("player_walkover_loss.html", "44d227e"),
+    ("player_walkover_tech.html", "23a3d0d"),
 ]
 
 

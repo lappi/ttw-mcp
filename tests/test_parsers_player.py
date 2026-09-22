@@ -167,3 +167,31 @@ def test_page_of_another_player_raises(load_fixture):
     )
     with pytest.raises(ParseError):
         parse_player_profile(broken, "1c18ed8")
+
+
+def test_all_walkover_forms_parse_on_real_profiles(load_fixture):
+    # Формы распределены по двум профилям: ни один не содержит все четыре.
+    loss = parse_player_profile(load_fixture("player_walkover_loss.html"), "44d227e")
+    tech = parse_player_profile(load_fixture("player_walkover_tech.html"), "23a3d0d")
+
+    def by_raw(profile, raw):
+        return [m for m in profile["matches"] if m["score_raw"] == raw]
+
+    assert len(by_raw(loss, "W:L")) == 1
+    assert by_raw(loss, "W:L")[0]["result"] == "walkover_win"
+    assert len(by_raw(loss, "L:W")) == 1
+    assert by_raw(loss, "L:W")[0]["result"] == "walkover_loss"
+    assert len(by_raw(tech, "Тех:W")) == 4
+    assert all(m["result"] == "walkover_loss" for m in by_raw(tech, "Тех:W"))
+
+    # Ни одного действительно неопознанного счёта на 2000 матчей.
+    assert [m for m in loss["matches"] if m["result"] == "unparsed"] == []
+    assert [m for m in tech["matches"] if m["result"] == "unparsed"] == []
+
+
+def test_not_played_is_separated_from_losses(load_fixture):
+    loss = parse_player_profile(load_fixture("player_walkover_loss.html"), "44d227e")
+    void = [m for m in loss["matches"] if m["result"] == "not_played"]
+    assert len(void) == 2
+    assert all(m["score_raw"] == "0:0" for m in void)
+    assert all(m["delta"] == 0.0 for m in void)
