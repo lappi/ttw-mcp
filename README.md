@@ -59,3 +59,7 @@ uv run pytest -m smoke                    # 3 теста против живог
 Без фикстур `pytest` сообщит, каким скриптом их восстановить.
 
 Дизайн: `docs/superpowers/specs/2026-09-22-ttw-mcp-design.md`
+
+## Лицензия
+
+MIT — см. [LICENSE](LICENSE).

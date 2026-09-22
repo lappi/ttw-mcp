@@ -2,6 +2,9 @@
 name = "ttw-mcp"
 version = "0.1.0"
 description = "MCP-сервер для рейтинга настольного тенниса r.ttw.ru"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 dependencies = [
     "mcp[cli]>=2.0",
@@ -9,6 +12,9 @@ dependencies = [
     "beautifulsoup4>=4.12",
     "soupsieve>=2.1",
 ]
+
+[project.urls]
+Repository = "https://github.com/lappi/ttw-mcp"
 
 [project.scripts]
 ttw-mcp = "ttw_mcp.server:main"
