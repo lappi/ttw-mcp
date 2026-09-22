@@ -1,5 +1,6 @@
 import pytest
 
+from ttw_mcp.errors import InvalidInput, ParseError
 from ttw_mcp.parsers.search import (
     PLAYER_SEARCH_CAP,
     TOURNAMENT_SEARCH_CAP,
@@ -43,10 +44,27 @@ def test_capped_search_is_flagged_as_truncated(load_fixture):
     assert len(result["players"]) == 5
 
 
-def test_empty_result_is_empty_list_not_error():
-    html = '<div class="layout-row player-page"><table></table></div>'
-    result = parse_player_search(html, limit=25)
+def test_zero_results_is_empty_list_not_error(load_fixture):
+    result = parse_player_search(load_fixture("search_players_zero.html"), limit=25)
     assert result == {"total_found": 0, "truncated": False, "players": []}
+
+
+def test_broken_markup_raises_parse_error():
+    with pytest.raises(ParseError):
+        parse_player_search("<html><body>ничего похожего</body></html>", limit=25)
+
+
+def test_renamed_class_raises_instead_of_reporting_zero(load_fixture):
+    # Ровно тот случай, который прежде был неотличим от «никого не нашлось».
+    broken = load_fixture("search_players_two.html").replace("player-list", "playerList")
+    with pytest.raises(ParseError):
+        parse_player_search(broken, limit=25)
+
+
+@pytest.mark.parametrize("bad", [0, -1])
+def test_non_positive_limit_is_rejected(load_fixture, bad):
+    with pytest.raises(InvalidInput):
+        parse_player_search(load_fixture("search_players_two.html"), limit=bad)
 
 
 def test_tournament_search_parses_ajax_divs(load_fixture):
@@ -61,3 +79,9 @@ def test_tournament_search_parses_ajax_divs(load_fixture):
 def test_tournament_search_empty_response():
     result = parse_tournament_search("")
     assert result == {"total_found": 0, "truncated": False, "tournaments": []}
+
+
+def test_retired_ajax_action_raises():
+    # admin-ajax отдаёт "0" на переименованное действие.
+    with pytest.raises(ParseError):
+        parse_tournament_search("0")

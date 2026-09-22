@@ -29,12 +29,31 @@ def _side(page, column: int) -> tuple[float, int]:
     return rating, rank
 
 
-def _block(page, index: int) -> tuple[dict, dict]:
-    """Блок «Победы» или «Партии»: два абсолютных значения и два процента."""
+def _block(page, index: int, title: str) -> tuple[dict, dict]:
+    """Блок «Победы» или «Партии»: два абсолютных значения и два процента.
+
+    Заголовки не подписаны семантическим классом, только порядком в DOM, а
+    оба блока используют одинаковую разметку значений. Переставь сайт блоки
+    местами — победы и партии поменялись бы молча, поэтому заголовок
+    сверяется явно вместо доверия к индексу.
+    """
     blocks = page.select("div.compare-block")
     if len(blocks) <= index:
         raise ParseError(PARSER, f"div.compare-block[{index}]")
     block = blocks[index]
+    heading = text_of(
+        require(
+            block.select_one("div.compare-block-title"),
+            f"div.compare-block[{index}] .compare-block-title",
+            PARSER,
+        )
+    )
+    if heading != title:
+        raise ParseError(
+            PARSER,
+            f"div.compare-block[{index}] .compare-block-title",
+            f"ожидался {title!r}, получен {heading!r}",
+        )
     left = block.select("div.compare-block-left")
     right = block.select("div.compare-block-right")
     if len(left) < 2 or len(right) < 2:
@@ -57,8 +76,8 @@ def parse_head_to_head(html: str, player_id: str, opponent_id: str) -> dict:
 
     player_rating, player_rank = _side(soup, 1)
     opponent_rating, opponent_rank = _side(soup, 3)
-    wins, win_pct = _block(soup, 0)
-    sets, sets_pct = _block(soup, 1)
+    wins, win_pct = _block(soup, 0, "Победы")
+    sets, sets_pct = _block(soup, 1, "Партии")
 
     player_name = text_of(names[0])
     opponent_name = text_of(names[2])

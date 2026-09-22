@@ -1,7 +1,9 @@
+import asyncio
+
 import pytest
+from mcp.server.mcpserver.exceptions import ToolError
 
 from ttw_mcp import server
-from ttw_mcp.errors import InvalidInput
 
 
 class StubClient:
@@ -30,8 +32,11 @@ def stub(monkeypatch):
 
 @pytest.mark.parametrize("bad", ["", "   ", "\n"])
 def test_search_players_rejects_empty_name(stub, bad):
+    # search_players несёт @_reporting, поэтому даже прямой вызов вместо
+    # исходного InvalidInput получает ToolError с его именем внутри — это
+    # тот же перевод, что видит модель через MCP.
     client = stub()
-    with pytest.raises(InvalidInput):
+    with pytest.raises(ToolError, match="InvalidInput"):
         server.search_players(bad)
     assert client.calls == []  # запрос не ушёл: страница весит 6.7 МБ
 
@@ -41,14 +46,14 @@ def test_search_players_rejects_empty_name(stub, bad):
 )
 def test_get_player_rejects_malformed_id(stub, bad):
     client = stub()
-    with pytest.raises(InvalidInput):
+    with pytest.raises(ToolError, match="InvalidInput"):
         server.get_player(bad)
     assert client.calls == []
 
 
 def test_search_tournaments_requires_at_least_one_argument(stub):
     client = stub()
-    with pytest.raises(InvalidInput):
+    with pytest.raises(ToolError, match="InvalidInput"):
         server.search_tournaments()
     assert client.calls == []
 
@@ -112,3 +117,22 @@ def test_search_players_docstring_explains_limit_versus_total():
     doc = server.search_players.__doc__
     assert "truncated" in doc
     assert "total_found" in doc and "limit" in doc
+
+
+def test_errors_reach_the_model_through_mcp(stub):
+    # Прямой вызов функции этот путь не проверяет: стирание происходит
+    # в SDK, между инструментом и моделью.
+    stub()
+    manager = server.mcp._tool_manager
+
+    async def call(name, args):
+        try:
+            await manager.call_tool(name, args, None)
+        except Exception as exc:  # noqa: BLE001 — нас интересует текст
+            return f"{type(exc).__name__}: {exc}"
+        return "без ошибки"
+
+    message = asyncio.run(call("get_player", {"player_id": "zz"}))
+    assert "ToolError" in message
+    assert "InvalidInput" in message
+    assert "player_id" in message

@@ -9,7 +9,7 @@ import re
 
 from bs4 import BeautifulSoup
 
-from ttw_mcp.errors import NotFound
+from ttw_mcp.errors import NotFound, ParseError
 from ttw_mcp.parsers.common import (
     extract_id,
     parse_date,
@@ -28,40 +28,56 @@ _NAME_RATING = re.compile(r"^(?P<name>.*?)\s*\((?P<rating>[\d.]+)\)$")
 def _split_name_rating(text: str) -> tuple[str, float]:
     match = _NAME_RATING.match(text)
     if match is None:
-        return text, 0.0
+        raise ParseError(PARSER, "ФИО (рейтинг)", f"получено {text!r}")
     return match.group("name"), float(match.group("rating"))
 
 
 def _parse_summary(page, player_id: str) -> tuple[str, dict]:
-    """Сводная строка: город и агрегаты. Отстаёт от matches на один период."""
-    for row in page.select("tr"):
-        cells = row.select("td")
-        if len(cells) == 6 and text_of(cells[0]) == player_id:
-            ratings = [parse_number(part) for part in text_of(cells[4]).split(",")]
-            stats = text_of(cells[5])
-            wins, losses = parse_win_loss(stats)
-            summary = {
-                "rated_periods": parse_int(text_of(cells[2])),
-                "tournaments_played": parse_int(text_of(cells[3])),
-                "rating_min": ratings[0],
-                "rating_max": ratings[1],
-                "rating_avg": ratings[2],
-                "games": parse_int(stats),
-                "wins": wins,
-                "losses": losses,
-                "win_pct": parse_int(stats.rsplit(",", 1)[-1]),
-            }
-            return text_of(cells[1]), summary
-    return "", {}
+    """Сводная строка: город и агрегаты. Отстаёт от matches на один период.
+
+    Заодно единственная проверка, что сайт отдал страницу запрошенного
+    игрока: при редиректе или кеше ответ иначе нёс бы чужие матчи под нашим
+    player_id, и единственным намёком была бы пустая сводка.
+    """
+    info = require(page.select_one("div.player-info"), "div.player-info", PARSER)
+    row = require(info.select_one("tbody tr"), "div.player-info tbody tr", PARSER)
+
+    actual = text_of(require(row.select_one("td.player-id-cell"), "td.player-id-cell", PARSER))
+    if actual != player_id:
+        raise ParseError(
+            PARSER,
+            "td.player-id-cell",
+            f"страница принадлежит игроку {actual!r}, запрошен {player_id!r}",
+        )
+
+    counts = row.select("td.player-rating-count-cell")
+    if len(counts) < 2:
+        raise ParseError(PARSER, "td.player-rating-count-cell", "ожидались две ячейки")
+    ratings = [parse_number(part) for part in text_of(counts[1]).split(",")]
+    stats = text_of(require(row.select_one("td.player-stat-cell"), "td.player-stat-cell", PARSER))
+    wins, losses = parse_win_loss(stats)
+    city = text_of(require(row.select_one("td.player-city-cell"), "td.player-city-cell", PARSER))
+    tournaments = require(
+        row.select_one("td.player-tournament-count-cell"), "td.player-tournament-count-cell", PARSER
+    )
+    return city, {
+        "rated_periods": parse_int(text_of(counts[0])),
+        "tournaments_played": parse_int(text_of(tournaments)),
+        "rating_min": ratings[0],
+        "rating_max": ratings[1],
+        "rating_avg": ratings[2],
+        "games": parse_int(stats),
+        "wins": wins,
+        "losses": losses,
+        "win_pct": parse_int(stats.rsplit(",", 1)[-1]),
+    }
 
 
 def _parse_all_games(page) -> tuple[list, list, list]:
     periods: list[dict] = []
     tournaments: list[dict] = []
     matches: list[dict] = []
-    block = page.select_one("div.player-all-games")
-    if block is None:
-        return periods, tournaments, matches
+    block = require(page.select_one("div.player-all-games"), "div.player-all-games", PARSER)
 
     current: dict = {}
     for row in block.select("tr"):
@@ -80,7 +96,9 @@ def _parse_all_games(page) -> tuple[list, list, list]:
 
         tournament_cell = row.select_one("td.game-tournament-name-cell")
         if tournament_cell is not None:
-            link = tournament_cell.select_one("a")
+            link = require(
+                tournament_cell.select_one("a"), "td.game-tournament-name-cell a", PARSER
+            )
             current = {
                 "date": parse_date(text_of(tournament_cell)),
                 "tournament_id": extract_id(link["href"]),
@@ -92,7 +110,7 @@ def _parse_all_games(page) -> tuple[list, list, list]:
 
         score_cell = row.select_one("td.game-score-cell")
         if score_cell is not None:
-            link = row.select_one("td.game-name-cell a")
+            link = require(row.select_one("td.game-name-cell a"), "td.game-name-cell a", PARSER)
             name, rating = _split_name_rating(text_of(link))
             raw_score = text_of(score_cell)
             score_for, score_against, result = parse_score(raw_score)

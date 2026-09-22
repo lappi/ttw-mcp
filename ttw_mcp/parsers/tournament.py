@@ -52,6 +52,12 @@ def parse_tournament(html: str, tournament_id: str) -> dict:
     if not meta_rows:
         raise ParseError(PARSER, "td.tournament-date-cell")
     own = _meta_row(meta_rows[0])
+    if own["id"] != tournament_id:
+        raise ParseError(
+            PARSER,
+            "td.tournament-info-cell a",
+            f"первая строка описывает турнир {own['id']!r}, запрошен {tournament_id!r}",
+        )
     series = [_meta_row(row) for row in meta_rows[1:]]
 
     standings = []

@@ -1,3 +1,5 @@
+import re
+
 import pytest
 
 from ttw_mcp.errors import ParseError
@@ -58,3 +60,10 @@ def test_series_lists_other_editions_with_ids(tournament):
 def test_broken_markup_raises_parse_error():
     with pytest.raises(ParseError):
         parse_tournament("<html><body>нет турнира</body></html>", "6ad412a")
+
+
+def test_intact_markup_with_zero_standings(load_fixture):
+    # Вёрстка цела, строк нет: пустой список, а не ошибка.
+    html = load_fixture("tournament.html")
+    stripped = re.sub(r"<tr><td class=\"player-place-cell\".*?</tr>", "", html, flags=re.S)
+    assert parse_tournament(stripped, "6ad412a")["standings"] == []

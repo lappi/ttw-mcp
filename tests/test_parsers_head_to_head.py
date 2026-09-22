@@ -60,3 +60,13 @@ def test_walkover_in_head_to_head_is_kept(load_fixture):
 def test_broken_markup_raises_parse_error():
     with pytest.raises(ParseError):
         parse_head_to_head("<html><body>пусто</body></html>", "a", "b")
+
+
+def test_players_who_never_met_give_empty_matches(load_fixture):
+    # Самый частый запрос модели. Страница рендерит блоки с нулями, а не
+    # опускает их, поэтому ParseError здесь быть не должно.
+    h2h = parse_head_to_head(load_fixture("head_to_head_never_met.html"), "1c18ed8", "7063200")
+    assert h2h["matches"] == []
+    assert h2h["wins"] == {"player": 0, "opponent": 0}
+    assert h2h["player"]["name"] == "<игрок A>"
+    assert h2h["opponent"]["name"] == "<игрок H>"

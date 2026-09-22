@@ -10,6 +10,8 @@ CASES = [
     ("search_players_two.html", "1c18ed8"),
     ("search_players_capped.html", "player-name-cell"),
     ("search_tournaments.html", "/tournaments/?id="),
+    ("head_to_head_never_met.html", "Противостояние"),
+    ("search_players_zero.html", "player-list"),
 ]
 
 

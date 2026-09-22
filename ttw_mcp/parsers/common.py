@@ -18,6 +18,7 @@ _NUMBER = re.compile(r"[+-]?\d+(?:\.\d+)?")
 _WIN_LOSS = re.compile(r"(\d+)\s*-\s*(\d+)")
 _SCORE = re.compile(r"^(\d+):(\d+)$")
 _ID = re.compile(r"[?&]id=([0-9a-f]+)")
+_WALKOVER = "W:Тех"
 
 
 def clean(text: str) -> str:
@@ -58,19 +59,22 @@ def parse_win_loss(text: str) -> tuple[int, int]:
 def parse_score(raw: str) -> tuple[int | None, int | None, str]:
     """Счёт матча. Техническую победу сайт пишет как "W:Тех", без партий.
 
-    Возвращает (партии за, партии против, исход). Для обычного счёта исход
-    "win" или "loss"; для технической победы — (None, None, "walkover").
+    Возвращает (партии за, партии против, исход). Обычный счёт даёт "win" или
+    "loss"; "W:Тех" — "walkover"; всё, что не опознано, — "unparsed" с
+    сохранённым исходным текстом в score_raw у вызывающего.
 
-    Молча выбросить такой матч нельзя: он сыгран, у него есть соперник и
-    рейтинговая дельта, а модель, считающая игры по списку, недосчиталась бы
-    одной и не смогла бы об этом узнать. Встречается и в списке матчей
-    профиля, и в очных встречах, поэтому живёт здесь, а не в одном парсере.
+    Разделять walkover и unparsed обязательно: иначе смена разделителя на
+    сайте превратила бы все матчи в технические победы и обнулила счёт побед,
+    и заметить это было бы нечем. Встречается и в списке матчей профиля, и в
+    очных встречах, поэтому живёт здесь, а не в одном парсере.
     """
     match = _SCORE.match(raw)
-    if match is None:
+    if match is not None:
+        score_for, score_against = int(match.group(1)), int(match.group(2))
+        return score_for, score_against, "win" if score_for > score_against else "loss"
+    if raw == _WALKOVER:
         return None, None, "walkover"
-    score_for, score_against = int(match.group(1)), int(match.group(2))
-    return score_for, score_against, "win" if score_for > score_against else "loss"
+    return None, None, "unparsed"
 
 
 def extract_id(href: str) -> str:

@@ -7,29 +7,43 @@
 
 from bs4 import BeautifulSoup
 
+from ttw_mcp.errors import InvalidInput, ParseError
 from ttw_mcp.parsers.common import (
     extract_id,
     parse_date,
     parse_int,
     parse_number,
     parse_win_loss,
+    require,
     text_of,
 )
 
 PLAYER_SEARCH_CAP = 500
 TOURNAMENT_SEARCH_CAP = 20
 
+PARSER = "parse_player_search"
+
 
 def parse_player_search(html: str, limit: int) -> dict:
+    if limit < 1:
+        raise InvalidInput(f"limit должен быть положительным, получено {limit}")
     soup = BeautifulSoup(html, "html.parser")
-    rows = [row for row in soup.select("tr") if row.select_one("td.player-name-cell")]
+    # Якорь: на странице с нулём результатов player-list присутствует с
+    # пустым tbody, а при изменившейся вёрстке исчезает. Без него «никого не
+    # нашлось» и «сайт переделали» выглядят одинаково.
+    listing = require(soup.select_one("div.player-list"), "div.player-list", PARSER)
+    rows = [row for row in listing.select("tr") if row.select_one("td.player-name-cell")]
 
     players = []
     for row in rows[:limit]:
         # В ячейке имени две ссылки на одного игрока: первая оборачивает
         # аватар, вторая несёт ФИО. Простое "a" выбрало бы картинку и вернуло
         # пустое имя, поэтому ссылку с изображением отсекаем.
-        link = row.select_one("td.player-name-cell a:not(:has(img))")
+        link = require(
+            row.select_one("td.player-name-cell a:not(:has(img))"),
+            "td.player-name-cell a:not(:has(img))",
+            PARSER,
+        )
         stat = text_of(row.select_one("td.player-stat-cell"))
         wins, losses = parse_win_loss(stat)
         players.append(
@@ -71,6 +85,12 @@ def parse_tournament_search(html: str) -> dict:
         for link in soup.select("a")
         if "/tournaments/" in link.get("href", "")
     ]
+    if not tournaments and html.strip():
+        raise ParseError(
+            "parse_tournament_search",
+            'a[href*="/tournaments/"]',
+            f"непустой ответ без ссылок на турниры: {html.strip()[:40]!r}",
+        )
     return {
         "total_found": len(tournaments),
         "truncated": len(tournaments) >= TOURNAMENT_SEARCH_CAP,

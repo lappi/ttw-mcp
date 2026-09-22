@@ -33,6 +33,8 @@ PAGES = [
         "/wp-admin/admin-ajax.php",
         {"action": "get_tournaments_by_name", "name": "энерджи", "date": ""},
     ),
+    ("head_to_head_never_met.html", "GET", "/players/", {"id": "1c18ed8", "with": "7063200"}),
+    ("search_players_zero.html", "GET", "/players/", {"player-name": "яяяяяя"}),
 ]
 
 

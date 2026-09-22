@@ -50,7 +50,13 @@ def test_parse_win_loss_splits_pair():
 
 @pytest.mark.parametrize(
     "raw,expected",
-    [("3:1", (3, 1, "win")), ("0:2", (0, 2, "loss")), ("W:Тех", (None, None, "walkover"))],
+    [
+        ("3:1", (3, 1, "win")),
+        ("0:2", (0, 2, "loss")),
+        ("W:Тех", (None, None, "walkover")),
+        ("3-1", (None, None, "unparsed")),
+        ("", (None, None, "unparsed")),
+    ],
 )
 def test_parse_score_handles_walkover(raw, expected):
     assert parse_score(raw) == expected

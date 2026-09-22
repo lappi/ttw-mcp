@@ -873,6 +873,7 @@ dependencies = [
     { name = "beautifulsoup4" },
     { name = "httpx" },
     { name = "mcp", extra = ["cli"] },
+    { name = "soupsieve" },
 ]
 
 [package.dev-dependencies]
@@ -885,6 +886,7 @@ requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4.12" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "mcp", extras = ["cli"], specifier = ">=2.0" },
+    { name = "soupsieve", specifier = ">=2.1" },
 ]
 
 [package.metadata.requires-dev]

@@ -143,3 +143,20 @@ def test_unknown_player_raises_not_found(load_fixture):
 def test_broken_markup_raises_parse_error():
     with pytest.raises(ParseError):
         parse_player_profile("<html><body>ничего похожего</body></html>", "1c18ed8")
+
+
+def test_missing_rating_in_opponent_name_raises(load_fixture):
+    broken = load_fixture("player_novice.html").replace(
+        "<игрок B> (206.48)", "<игрок B>"
+    )
+    with pytest.raises(ParseError):
+        parse_player_profile(broken, "1c18ed8")
+
+
+def test_page_of_another_player_raises(load_fixture):
+    broken = load_fixture("player_novice.html").replace(
+        '<td class="player-id-cell" title="1c18ed8">1c18ed8</td>',
+        '<td class="player-id-cell" title="deadbee">deadbee</td>',
+    )
+    with pytest.raises(ParseError):
+        parse_player_profile(broken, "1c18ed8")

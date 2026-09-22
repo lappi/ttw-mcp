@@ -4,12 +4,14 @@
 ограничения источника, без знания которых модель делает неверные выводы.
 """
 
+import functools
 import re
 
 from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 
 from ttw_mcp.client import TtwClient
-from ttw_mcp.errors import InvalidInput
+from ttw_mcp.errors import InvalidInput, TtwError
 from ttw_mcp.parsers.head_to_head import parse_head_to_head
 from ttw_mcp.parsers.player import parse_player_profile
 from ttw_mcp.parsers.search import parse_player_search, parse_tournament_search
@@ -22,6 +24,26 @@ _client = TtwClient()
 # завершающим переводом строки, так что "1c18ed8\n" прошёл бы проверку и
 # ушёл бы в запрос, нарушая правило «отказ до обращения к сети».
 _ID = re.compile(r"[0-9a-f]{4,16}")
+_DATE = re.compile(r"[0-9]{2}\.[0-9]{2}\.[0-9]{4}")
+
+
+def _reporting(fn):
+    """Доносит ошибки проекта до модели.
+
+    SDK превращает всё, кроме ToolError, в безликое "Error executing tool
+    <name>", и тогда ParseError теряет имя селектора, а NotFound становится
+    неотличим от падения сайта. Перевод делаем здесь: errors.py и parsers/
+    остаются свободны от зависимости на MCP.
+    """
+
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except TtwError as exc:
+            raise ToolError(f"{type(exc).__name__}: {exc}") from exc
+
+    return wrapper
 
 
 def _valid_id(value: str, field: str) -> str:
@@ -38,6 +60,7 @@ def _valid_name(value: str, field: str) -> str:
 
 
 @mcp.tool()
+@_reporting
 def search_players(name: str, limit: int = 25) -> dict:
     """Ищет игроков по фамилии или части имени.
 
@@ -56,6 +79,7 @@ def search_players(name: str, limit: int = 25) -> dict:
 
 
 @mcp.tool()
+@_reporting
 def get_player(player_id: str) -> dict:
     """Возвращает профиль игрока: сводку, периоды рейтинга, турниры и все матчи.
 
@@ -72,12 +96,16 @@ def get_player(player_id: str) -> dict:
     Техническая победа приходит с result "walkover", score_for и
     score_against равны null, а исходная запись сайта лежит в score_raw.
     Такой матч сыгран и учитывается наравне с остальными.
+
+    Неопознанный счёт приходит с result "unparsed" — это признак изменившейся
+    вёрстки, а не результат матча.
     """
     html = _client.get_html("/players/", {"id": _valid_id(player_id, "player_id")})
     return parse_player_profile(html, player_id)
 
 
 @mcp.tool()
+@_reporting
 def get_head_to_head(player_id: str, opponent_id: str) -> dict:
     """Возвращает очное противостояние двух игроков.
 
@@ -86,6 +114,8 @@ def get_head_to_head(player_id: str, opponent_id: str) -> dict:
     точным значением с двумя знаками идите в get_player.
 
     Пустой matches означает, что игроки не встречались.
+
+    Техническая победа приходит с пустыми партиями, как и в get_player.
     """
     return parse_head_to_head(
         _client.get_html(
@@ -101,19 +131,27 @@ def get_head_to_head(player_id: str, opponent_id: str) -> dict:
 
 
 @mcp.tool()
+@_reporting
 def search_tournaments(name: str = "", date: str = "") -> dict:
     """Ищет турниры по названию и дате.
 
-    Нужен хотя бы один аргумент. Сайт отдаёт максимум 20 результатов без
-    пагинации; при достижении потолка truncated равно true.
+    Нужен хотя бы один аргумент. Дата задаётся в формате сайта DD.MM.YYYY,
+    а не в ISO — это единственное место в проекте, где наружу смотрит формат
+    источника, потому что значение уходит в его же поисковую форму.
+
+    Сайт отдаёт максимум 20 результатов без пагинации; при достижении
+    потолка truncated равно true.
     """
     if not (name or "").strip() and not (date or "").strip():
         raise InvalidInput("нужен хотя бы один из аргументов: name или date")
+    if date and not _DATE.fullmatch(date):
+        raise InvalidInput(f"date должен быть в формате DD.MM.YYYY, получено {date!r}")
     html = _client.post_ajax("get_tournaments_by_name", name=name, date=date)
     return parse_tournament_search(html)
 
 
 @mcp.tool()
+@_reporting
 def get_tournament(tournament_id: str) -> dict:
     """Возвращает турнир: метаданные, итоговую таблицу и другие турниры серии.
 
