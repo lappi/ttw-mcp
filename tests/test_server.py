@@ -36,7 +36,9 @@ def test_search_players_rejects_empty_name(stub, bad):
     assert client.calls == []  # запрос не ушёл: страница весит 6.7 МБ
 
 
-@pytest.mark.parametrize("bad", ["", "ZZZZ", "1c18ed8!", "0123456789abcdef0"])
+@pytest.mark.parametrize(
+    "bad", ["", "ZZZZ", "1c18ed8!", "0123456789abcdef0", "1c18ed8\n"]
+)
 def test_get_player_rejects_malformed_id(stub, bad):
     client = stub()
     with pytest.raises(InvalidInput):
@@ -89,10 +91,24 @@ def test_search_tournaments_uses_ajax(stub, load_fixture):
 
 
 def test_get_player_docstring_warns_about_window_and_lag():
+    # Подстрочные проверки вроде `"12" in doc` проходят и на докстринге,
+    # утверждающем обратное, поэтому сверяемся с формулировками, которые
+    # нельзя удовлетворить противоположным по смыслу текстом.
     doc = server.get_player.__doc__
-    assert "12" in doc
-    assert "summary" in doc
+    assert "12 месяцев" in doc
+    assert "summary" in doc and "отстаёт" in doc
+    assert "используйте matches" in doc
+    assert "walkover" in doc
 
 
 def test_get_tournament_docstring_warns_there_are_no_matches():
-    assert "матч" in server.get_tournament.__doc__.lower()
+    doc = server.get_tournament.__doc__
+    assert "только итоговую таблицу" in doc
+    assert "Отдельных матчей" in doc
+    assert "get_player" in doc
+
+
+def test_search_players_docstring_explains_limit_versus_total():
+    doc = server.search_players.__doc__
+    assert "truncated" in doc
+    assert "total_found" in doc and "limit" in doc

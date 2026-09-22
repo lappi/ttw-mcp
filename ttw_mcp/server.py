@@ -18,11 +18,14 @@ from ttw_mcp.parsers.tournament import parse_tournament
 mcp = MCPServer("ttw")
 _client = TtwClient()
 
-_ID = re.compile(r"^[0-9a-f]{4,16}$")
+# fullmatch без якорей, а не match с "$": в Python "$" совпадает и перед
+# завершающим переводом строки, так что "1c18ed8\n" прошёл бы проверку и
+# ушёл бы в запрос, нарушая правило «отказ до обращения к сети».
+_ID = re.compile(r"[0-9a-f]{4,16}")
 
 
 def _valid_id(value: str, field: str) -> str:
-    if not _ID.match(value or ""):
+    if not _ID.fullmatch(value or ""):
         raise InvalidInput(f"{field} должен быть hex-строкой вида 1c18ed8, получено {value!r}")
     return value
 
@@ -42,6 +45,10 @@ def search_players(name: str, limit: int = 25) -> dict:
     Сайт возвращает максимум 500 строк без пагинации; при достижении
     потолка поле truncated равно true и запрос надо сузить.
     Однофамильцев много, различать их следует по городу и рейтингу.
+
+    Аргумент limit укорачивает только список players. Поле total_found
+    всегда показывает, сколько строк реально нашлось на странице, поэтому
+    эти два числа расходятся намеренно, а не по ошибке.
     """
     cleaned = _valid_name(name, "name")
     html = _client.get_html("/players/", {"player-name": cleaned})
