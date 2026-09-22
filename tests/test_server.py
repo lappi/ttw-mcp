@@ -375,6 +375,50 @@ def test_series_rejects_a_non_positive_limit(stub, load_fixture):
     assert client.calls == []
 
 
+def test_series_comes_entirely_from_participants_when_page_list_is_empty(
+    stub_multi, load_fixture
+):
+    # У первого турнира серии список на странице пуст — не отсутствует,
+    # а пуст: ни одной строки серии, только строка самого турнира. Получаем
+    # такую фикстуру тем же приёмом, что и для турнира без итоговой
+    # таблицы: вырезаем регулярным выражением лишние строки, оставляя
+    # первую (иначе она перестанет описывать запрошенный турнир и
+    # parse_tournament упадёт на сверке own["id"] с tournament_id).
+    html = load_fixture("tournament.html")
+    seen = 0
+
+    def _keep_first(match: re.Match) -> str:
+        nonlocal seen
+        seen += 1
+        return match.group(0) if seen == 1 else ""
+
+    stripped = re.sub(
+        r'<tr><td class="tournament-date-cell".*?</tr>', _keep_first, html, flags=re.S
+    )
+    stub_multi(
+        {
+            "6ad412a": stripped,
+            "1c18ed8": load_fixture("player_novice.html"),
+            "17828c3": load_fixture("player_participant.html"),
+        }
+    )
+    result = server.get_series("6ad412a")
+    assert result["events"], "серия не пуста"
+    assert all(e["source"] == "participants" for e in result["events"])
+    assert result["events_found"] == len(result["events"])
+
+
+def test_series_falls_back_to_page_list_when_no_profile_is_reachable(stub_multi, load_fixture):
+    # Сайт лежит целиком: ни один профиль не собрать. Серия тогда честно
+    # собирается только из списка на странице, а не превращается в пустоту
+    # или падение.
+    stub_multi({"6ad412a": load_fixture("tournament.html")})
+    result = server.get_series("6ad412a")
+    assert len(result["events"]) == 5
+    assert all(e["source"] == "page" for e in result["events"])
+    assert len(result["missing_profiles"]) == 17
+
+
 @pytest.mark.parametrize(
     "left,right",
     [
