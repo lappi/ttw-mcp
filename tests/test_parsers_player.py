@@ -68,6 +68,7 @@ def test_first_match_fully_parsed(novice):
     match = novice["matches"][0]
     assert match["date"] == "2026-09-20"
     assert match["tournament_id"] == "5f73688"
+    assert match["score_raw"] == "0:2"
     assert match["score_for"] == 0
     assert match["score_against"] == 2
     assert match["result"] == "loss"
@@ -90,12 +91,26 @@ def test_empty_best_wins_is_empty_list_not_error(novice):
     assert novice["best_wins"] == []
 
 
+def test_walkover_match_is_kept_not_dropped(veteran):
+    # Техническую победу сайт пишет как "W:Тех" вместо счёта. Матч сыгран, у
+    # него есть соперник и дельта, поэтому он остаётся в списке: исчезнув
+    # молча, он занизил бы любой подсчёт игр, и заметить это было бы нечем.
+    walkovers = [m for m in veteran["matches"] if m["result"] == "walkover"]
+    assert len(walkovers) == 1
+    only = walkovers[0]
+    assert only["score_raw"] == "W:Тех"
+    assert only["score_for"] is None
+    assert only["score_against"] is None
+    assert only["opponent_name"] == "<игрок E>"
+    assert only["opponent_rating"] == pytest.approx(143.72)
+
+
 def test_veteran_has_full_twelve_month_window(veteran):
     assert veteran["name"] == "<игрок B>"
     assert veteran["rank"] == 44245
     assert veteran["current_rating"] == pytest.approx(208.39)
     assert len(veteran["periods"]) == 13
-    assert len(veteran["matches"]) == 105
+    assert len(veteran["matches"]) == 106
     assert veteran["summary"]["wins"] == 71
     assert veteran["summary"]["losses"] == 27
     assert veteran["summary"]["win_pct"] == 72

@@ -22,6 +22,23 @@ from ttw_mcp.parsers.common import (
 
 PARSER = "parse_player_profile"
 _NAME_RATING = re.compile(r"^(?P<name>.*?)\s*\((?P<rating>[\d.]+)\)$")
+_SCORE = re.compile(r"^(\d+):(\d+)$")
+
+
+def _parse_score(raw: str) -> tuple[int | None, int | None, str]:
+    """Счёт матча. Техническую победу сайт пишет как "W:Тех", без партий.
+
+    Такой матч возвращается наравне с обычными: партии null, result
+    "walkover", исходная запись сохранена в score_raw. Молча выбросить его
+    нельзя — это сыгранный матч с реальным соперником и реальной дельтой, а
+    модель, считающая игры по этому списку, недосчиталась бы одной и не
+    смогла бы об этом узнать.
+    """
+    match = _SCORE.match(raw)
+    if match is None:
+        return None, None, "walkover"
+    score_for, score_against = int(match.group(1)), int(match.group(2))
+    return score_for, score_against, "win" if score_for > score_against else "loss"
 
 
 def _split_name_rating(text: str) -> tuple[str, float]:
@@ -91,22 +108,19 @@ def _parse_all_games(page) -> tuple[list, list, list]:
 
         score_cell = row.select_one("td.game-score-cell")
         if score_cell is not None:
-            score_parts = text_of(score_cell).split(":")
-            if len(score_parts) != 2 or not all(p.strip().isdigit() for p in score_parts):
-                # Технический результат ("W:Тех" — победа техническим
-                # поражением соперника) не выражается числовым счётом.
-                continue
             link = row.select_one("td.game-name-cell a")
             name, rating = _split_name_rating(text_of(link))
-            score_for, score_against = (int(x) for x in score_parts)
+            raw_score = text_of(score_cell)
+            score_for, score_against, result = _parse_score(raw_score)
             matches.append(
                 {
                     "date": current.get("date", ""),
                     "tournament_id": current.get("tournament_id", ""),
                     "tournament_title": current.get("title", ""),
+                    "score_raw": raw_score,
                     "score_for": score_for,
                     "score_against": score_against,
-                    "result": "win" if score_for > score_against else "loss",
+                    "result": result,
                     "opponent_id": extract_id(link["href"]),
                     "opponent_name": name,
                     "opponent_rating": rating,
@@ -138,11 +152,13 @@ def _parse_best_wins(page) -> list[dict]:
             names = row.select("td.player-name-cell")
             _, own_rating = _split_name_rating(text_of(names[0]))
             opponent_name, opponent_rating = _split_name_rating(text_of(names[1]))
-            score_for, score_against = (int(x) for x in text_of(score_cell).split(":"))
+            raw_score = text_of(score_cell)
+            score_for, score_against, _ = _parse_score(raw_score)
             best.append(
                 {
                     **current,
                     "player_rating": own_rating,
+                    "score_raw": raw_score,
                     "score_for": score_for,
                     "score_against": score_against,
                     "opponent_name": opponent_name,
