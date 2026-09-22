@@ -118,7 +118,9 @@ def get_player(
     отсутствуют (а не пусты), но matches_total и best_wins_total
     присутствуют всегда и считаются по полному списку. matches_since
     (формат YYYY-MM-DD) сужает matches до матчей не раньше этой даты, не
-    трогая при этом matches_total — оно по-прежнему про весь список.
+    трогая при этом matches_total — оно по-прежнему про весь список. При
+    include_matches=False значение matches_since молча игнорируется:
+    фильтровать нечего, ошибки это не вызывает.
     """
     since = matches_since.strip() or None
     if since is not None and not _ISO_DATE.fullmatch(since):

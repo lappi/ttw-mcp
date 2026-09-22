@@ -295,3 +295,25 @@ def test_matches_since_filters_but_reports_the_whole(load_fixture):
     assert recent["matches_total"] == 106
     assert len(recent["matches"]) == 7
     assert all(m["date"] >= "2026-09-01" for m in recent["matches"])
+
+
+def test_matches_since_in_the_future_empties_matches_but_keeps_the_total(load_fixture):
+    # Пустой matches при ненулевом matches_total — это «за этот период не
+    # играл», а не «матчей нет вообще». Разница видна только по счётчику.
+    empty = parse_player_profile(
+        load_fixture("player_veteran.html"), "66f1645", matches_since="2099-01-01"
+    )
+    assert empty["matches_total"] == 106
+    assert empty["matches"] == []
+
+
+def test_matches_since_is_ignored_when_matches_are_excluded(load_fixture):
+    slim = parse_player_profile(
+        load_fixture("player_veteran.html"),
+        "66f1645",
+        include_matches=False,
+        matches_since="2026-09-01",
+    )
+    assert "matches" not in slim
+    assert "best_wins" not in slim
+    assert slim["matches_total"] == 106
