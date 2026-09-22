@@ -12,12 +12,13 @@ from mcp.server.mcpserver.exceptions import ToolError
 
 from ttw_mcp.client import TtwClient
 from ttw_mcp.collect import collect_profiles
-from ttw_mcp.errors import InvalidInput, ParseError, TtwError
+from ttw_mcp.errors import InvalidInput, TtwError
 from ttw_mcp.parsers.head_to_head import parse_head_to_head
 from ttw_mcp.parsers.player import parse_player_profile
 from ttw_mcp.parsers.search import parse_player_search, parse_tournament_search
 from ttw_mcp.parsers.tournament import parse_tournament
 from ttw_mcp.rating import annotate_matches, rating_at_event
+from ttw_mcp.reconcile import reconcile_matches
 
 mcp = MCPServer("ttw")
 _client = TtwClient()
@@ -255,93 +256,6 @@ def get_tournament(tournament_id: str, ratings_at_event: bool = False) -> dict:
     return result
 
 
-_MIRROR = {
-    "win": "loss",
-    "loss": "win",
-    "walkover_win": "walkover_loss",
-    "walkover_loss": "walkover_win",
-    "not_played": "not_played",
-    "unparsed": "unparsed",
-}
-
-
-def _is_mirror(left: dict, right: dict) -> bool:
-    """Две записи описывают один и тот же матч с разных сторон."""
-    return (
-        left["score_for"] == right["score_against"]
-        and left["score_against"] == right["score_for"]
-        and _MIRROR.get(left["result"]) == right["result"]
-    )
-
-
-def _reconcile_matches(profiles: dict[str, dict], tournament_id: str) -> list[dict]:
-    """Сводит матчи одного турнира из профилей участников.
-
-    Отбор идёт по tournament_id, а не по дате: участник мог в тот же день
-    сыграть ещё один турнир (get_tournament это отдельно оговаривает), и
-    фильтр по дате затянул бы в выдачу матчи чужого турнира того же дня —
-    в лучшем случае лишние строки, в худшем ParseError на исправных
-    данных, если у такой строки случайно не нашлось бы зеркала. Замерено,
-    что поле tournament_id заполнено у всех проверенных матчей и в дни с
-    двумя турнирами делит их начисто.
-
-    Матч виден с двух сторон, если собраны оба профиля, и с одной, если
-    собран только один. Строки группируются по паре игроков, и каждой
-    ищется зеркальная у соперника. Пары играют дважды за день постоянно —
-    групповой этап плюс плей-офф, — поэтому сводятся списки с учётом
-    кратности, а не одиночные записи.
-
-    Если у строки нет зеркала, а профиль соперника собран, поднимается
-    ParseError: выбрать одну из двух версий счёта молча значило бы отдать
-    модели выдуманный результат.
-    """
-    rows: dict[tuple[str, str], list[dict]] = {}
-    for player_id, profile in profiles.items():
-        for match in profile.get("matches", []):
-            if match["tournament_id"] != tournament_id:
-                continue
-            key = tuple(sorted((player_id, match["opponent_id"])))
-            rows.setdefault(key, []).append(
-                {
-                    "player_id": player_id,
-                    "opponent_id": match["opponent_id"],
-                    "date": match["date"],
-                    "score_raw": match["score_raw"],
-                    "score_for": match["score_for"],
-                    "score_against": match["score_against"],
-                    "result": match["result"],
-                    "delta": match["delta"],
-                }
-            )
-
-    matches: list[dict] = []
-    for (left_id, right_id), entries in rows.items():
-        left = [e for e in entries if e["player_id"] == left_id]
-        spare = [e for e in entries if e["player_id"] == right_id]
-        for entry in left:
-            mirror = next((o for o in spare if _is_mirror(entry, o)), None)
-            if mirror is not None:
-                spare.remove(mirror)
-            elif right_id in profiles:
-                raise ParseError(
-                    "get_tournament_matches",
-                    "game-score-cell",
-                    f"нет зеркальной записи в профиле {right_id}: {entry}",
-                )
-            matches.append(entry)
-        for leftover in spare:
-            if left_id in profiles:
-                raise ParseError(
-                    "get_tournament_matches",
-                    "game-score-cell",
-                    f"нет зеркальной записи в профиле {left_id}: {leftover}",
-                )
-            matches.append(leftover)
-
-    matches.sort(key=lambda m: (m["player_id"], m["opponent_id"], m["score_raw"]))
-    return matches
-
-
 @mcp.tool()
 @_reporting
 def get_tournament_matches(tournament_id: str) -> dict:
@@ -371,7 +285,7 @@ def get_tournament_matches(tournament_id: str) -> dict:
     date = tournament["date"]
     ids = [row["player_id"] for row in tournament["standings"]]
     profiles, missing = collect_profiles(_client, ids)
-    matches = _reconcile_matches(profiles, tournament_id)
+    matches = reconcile_matches(profiles, tournament_id)
 
     return {
         "tournament_id": tournament_id,
