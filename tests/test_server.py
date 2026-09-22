@@ -188,6 +188,42 @@ def test_search_tournaments_uses_ajax(stub, load_fixture):
     assert result["truncated"] is True
 
 
+def test_docstrings_carry_the_measured_gotchas():
+    # Докстринг — единственный канал, из которого модель узнаёт об
+    # ограничениях источника. Подстрочные проверки тут бесполезны, поэтому
+    # сверяемся с формулировками, которые нельзя удовлетворить текстом
+    # противоположного смысла. Слабость этих проверок известна: они ловят
+    # молчание докстринга о поле, а не враньё в его тексте.
+    player = server.get_player.__doc__
+    assert "rated_periods" in player and "не несёт информации" in player
+    assert "walkover_win" in player and "walkover_loss" in player
+    assert "not_played" in player
+    assert "seed_rating" in player and "first_rated_date" in player
+    assert "matches_total" in player
+    assert "rating_min" in player
+    assert "player_rating_current" in player
+    assert "hand" in player
+
+    tournament = server.get_tournament.__doc__
+    assert "rating_current" in tournament
+    assert "rating_at_event" in tournament
+    assert "сумма дельт" in tournament
+    assert "ratings_at_event_resolved" in tournament
+
+    matches = server.get_tournament_matches.__doc__
+    assert "player_id" in matches
+
+    series = server.get_series.__doc__
+    assert "включая запрошенный" in series
+
+    search_t = server.search_tournaments.__doc__
+    assert "total_found" in search_t
+
+    search = server.search_players.__doc__
+    assert "город" in search and "ненадёжно" in search
+    assert "несколько профилей" in search
+
+
 def test_get_player_docstring_warns_about_window_and_lag():
     # Подстрочные проверки вроде `"12" in doc` проходят и на докстринге,
     # утверждающем обратное, поэтому сверяемся с формулировками, которые
