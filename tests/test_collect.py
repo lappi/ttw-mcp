@@ -60,3 +60,29 @@ def test_a_broken_page_is_not_reported_as_a_missing_player(load_fixture):
     client = RecordingClient({"1c18ed8": "<html><body>ничего похожего</body></html>"})
     with pytest.raises(ParseError):
         collect_profiles(client, ["1c18ed8"])
+
+
+def test_a_missing_identifier_is_not_retried_within_one_call():
+    # Без проверки и по missing тоже повторно перечисленный недоступный
+    # игрок ушёл бы в сеть второй раз и задвоился бы в missing.
+    client = RecordingClient({})
+    profiles, missing = collect_profiles(client, ["deadbee", "deadbee"])
+    assert client.calls == ["deadbee"]
+    assert profiles == {}
+    assert missing == ["deadbee"]
+
+
+def test_an_empty_list_of_identifiers_makes_no_calls():
+    client = RecordingClient({})
+    profiles, missing = collect_profiles(client, [])
+    assert client.calls == []
+    assert profiles == {}
+    assert missing == []
+
+
+def test_all_missing_players_keep_their_order():
+    client = RecordingClient({})
+    profiles, missing = collect_profiles(client, ["deadbee", "cafebab", "deadbee", "f00d000"])
+    assert client.calls == ["deadbee", "cafebab", "f00d000"]
+    assert profiles == {}
+    assert missing == ["deadbee", "cafebab", "f00d000"]
