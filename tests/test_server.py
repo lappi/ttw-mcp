@@ -38,6 +38,7 @@ def stub_multi(monkeypatch):
         class MultiStub:
             def __init__(self):
                 self.calls = []
+                self.ajax = ""
 
             def get_html(self, path, params):
                 key = params["id"]
@@ -45,6 +46,10 @@ def stub_multi(monkeypatch):
                 if key not in pages:
                     raise NotFound(f"нет страницы для {key}")
                 return pages[key]
+
+            def post_ajax(self, action, **fields):
+                self.calls.append(f"{action}:{fields.get('date', '')}")
+                return self.ajax
 
         client = MultiStub()
         monkeypatch.setattr(server, "_client", client)
@@ -434,3 +439,76 @@ def test_series_key_unifies_the_measured_spellings(left, right):
 
 def test_series_key_keeps_different_series_apart():
     assert server._series_key("Город. Турнир А") != server._series_key("Город. Турнир Б")
+
+
+def test_date_range_queries_every_day_in_it(stub, load_fixture):
+    client = stub(load_fixture("search_tournaments.html"))
+    result = server.search_tournaments(date_from="01.09.2026", date_to="03.09.2026")
+    # Ajax принимает одну дату, поэтому диапазон стоит по запросу на день.
+    assert [call[2]["date"] for call in client.calls] == [
+        "01.09.2026",
+        "02.09.2026",
+        "03.09.2026",
+    ]
+    # Заглушка отдаёт одну и ту же страницу трижды: склейка по id оставляет 20.
+    assert result["total_found"] == 20
+    assert result["truncated"] is True
+
+
+def test_range_longer_than_two_weeks_is_refused(stub):
+    client = stub()
+    with pytest.raises(ToolError, match="14"):
+        server.search_tournaments(date_from="01.01.2026", date_to="01.03.2026")
+    assert client.calls == []
+
+
+def test_range_ends_before_it_starts(stub):
+    client = stub()
+    with pytest.raises(ToolError, match="раньше"):
+        server.search_tournaments(date_from="03.09.2026", date_to="01.09.2026")
+    assert client.calls == []
+
+
+def test_range_needs_both_ends(stub):
+    client = stub()
+    with pytest.raises(ToolError, match="вместе"):
+        server.search_tournaments(date_from="01.09.2026")
+    assert client.calls == []
+
+
+def test_date_and_range_together_are_refused(stub):
+    # Два несовместимых намерения: молча выполнить одно значило бы
+    # ответить на вопрос, которого не задавали.
+    client = stub()
+    with pytest.raises(ToolError, match="порознь"):
+        server.search_tournaments(date="01.09.2026", date_from="01.09.2026", date_to="02.09.2026")
+    assert client.calls == []
+
+
+def test_impossible_date_is_named_not_erased(stub):
+    # Регулярка пропускает 99.99.2026; без явной проверки модель получила
+    # бы стёртое «Error executing tool» без причины.
+    client = stub()
+    with pytest.raises(ToolError, match="InvalidInput"):
+        server.search_tournaments(date_from="99.99.2026", date_to="99.99.2026")
+    assert client.calls == []
+
+
+def test_enrich_costs_a_request_per_row(stub_multi, load_fixture):
+    client = stub_multi({"6ad412a": load_fixture("tournament.html")})
+    client.ajax = '<div>1. <a href="/tournaments/?id=6ad412a">Турнир</a></div>'
+    result = server.search_tournaments(name="турнир", enrich=True)
+    row = result["tournaments"][0]
+    assert row["date"] == "2026-09-13"
+    assert row["participants"] == 17
+    assert row["address"]
+    # Один ajax плюс одна загрузка турнира.
+    assert client.calls == ["get_tournaments_by_name:", "6ad412a"]
+
+
+def test_search_without_enrich_does_not_load_tournaments(stub_multi):
+    client = stub_multi({})
+    client.ajax = '<div>1. <a href="/tournaments/?id=6ad412a">Турнир</a></div>'
+    result = server.search_tournaments(name="турнир")
+    assert "date" not in result["tournaments"][0]
+    assert client.calls == ["get_tournaments_by_name:"]

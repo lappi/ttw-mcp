@@ -6,6 +6,7 @@
 
 import functools
 import re
+from datetime import date, datetime, timedelta
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
@@ -31,6 +32,8 @@ _DATE = re.compile(r"[0-9]{2}\.[0-9]{2}\.[0-9]{4}")
 _ISO_DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 _SERIES_SPACE = re.compile(r"\s+")
 _SERIES_PUNCT = re.compile(r"\s*([.,])\s*")
+
+MAX_RANGE_DAYS = 14
 
 
 def _reporting(fn):
@@ -211,24 +214,112 @@ def get_head_to_head(player_id: str, opponent_id: str) -> dict:
     )
 
 
+def _day(value: str, field: str) -> date:
+    try:
+        return datetime.strptime(value, "%d.%m.%Y").date()
+    except ValueError as exc:
+        raise InvalidInput(f"{field}: {value!r} не является датой") from exc
+
+
+def _dates_in_range(date_from: str, date_to: str) -> list[str]:
+    """Перечисляет даты диапазона в формате сайта.
+
+    Ajax принимает единственную дату, поэтому диапазон стоит по запросу на
+    день. Потолок в две недели выбран как компромисс: сайт отвечает по
+    4–17 секунд и просит себя не обходить, а молча выполнить перебор на год
+    значило бы превратить инструмент в краулер.
+    """
+    start = _day(date_from, "date_from")
+    end = _day(date_to, "date_to")
+    if end < start:
+        raise InvalidInput(f"date_to {date_to} раньше date_from {date_from}")
+    days = (end - start).days + 1
+    if days > MAX_RANGE_DAYS:
+        raise InvalidInput(
+            f"диапазон в {days} дней потребовал бы {days} запросов к сайту; "
+            f"максимум {MAX_RANGE_DAYS}"
+        )
+    return [(start + timedelta(days=i)).strftime("%d.%m.%Y") for i in range(days)]
+
+
 @mcp.tool()
 @_reporting
-def search_tournaments(name: str = "", date: str = "") -> dict:
+def search_tournaments(
+    name: str = "",
+    date: str = "",
+    date_from: str = "",
+    date_to: str = "",
+    enrich: bool = False,
+) -> dict:
     """Ищет турниры по названию и дате.
 
     Нужен хотя бы один аргумент. Дата задаётся в формате сайта DD.MM.YYYY,
     а не в ISO — это единственное место в проекте, где наружу смотрит формат
     источника, потому что значение уходит в его же поисковую форму.
 
-    Сайт отдаёт максимум 20 результатов без пагинации; при достижении
-    потолка truncated равно true.
+    date_from и date_to задают диапазон и стоят по запросу на каждый день:
+    ajax принимает только одну дату. Диапазон длиннее двух недель
+    отклоняется, чтобы инструмент не превратился в краулер по сайту,
+    который просит себя не обходить. date и диапазон date_from/date_to
+    задаются порознь: передав то и другое сразу, вы получите отказ, а не
+    ответ на один из двух вопросов молча за счёт другого.
+
+    При диапазоне строки за разные дни склеиваются по идентификатору
+    турнира, поэтому total_found — это число различных турниров за весь
+    диапазон, а не размер ответа за один день. truncated равно true, если
+    потолок в двадцать строк был достигнут хотя бы в один из дней
+    диапазона.
+
+    enrich=True добавляет каждой строке дату, адрес и число участников,
+    загружая турнир отдельно — ещё один запрос на строку, до двадцати.
+
+    Сайт отдаёт максимум 20 результатов на один запрос без пагинации; при
+    достижении потолка поле truncated равно true.
     """
-    if not (name or "").strip() and not (date or "").strip():
-        raise InvalidInput("нужен хотя бы один из аргументов: name или date")
-    if date.strip() and not _DATE.fullmatch(date.strip()):
-        raise InvalidInput(f"date должен быть в формате DD.MM.YYYY, получено {date!r}")
-    html = _client.post_ajax("get_tournaments_by_name", name=name, date=date)
-    return parse_tournament_search(html)
+    has_range = bool(date_from.strip()) or bool(date_to.strip())
+    if has_range and not (date_from.strip() and date_to.strip()):
+        raise InvalidInput("date_from и date_to задаются только вместе")
+    if has_range and date.strip():
+        raise InvalidInput("date и диапазон date_from/date_to задаются порознь")
+    if not name.strip() and not date.strip() and not has_range:
+        raise InvalidInput(
+            "нужен хотя бы один из аргументов: name, date или диапазон дат"
+        )
+    for value, field in ((date, "date"), (date_from, "date_from"), (date_to, "date_to")):
+        if value.strip() and not _DATE.fullmatch(value.strip()):
+            raise InvalidInput(
+                f"{field} должен быть в формате DD.MM.YYYY, получено {value!r}"
+            )
+
+    dates = (
+        _dates_in_range(date_from.strip(), date_to.strip()) if has_range else [date]
+    )
+
+    found: dict[str, dict] = {}
+    truncated = False
+    for one in dates:
+        page = parse_tournament_search(
+            _client.post_ajax("get_tournaments_by_name", name=name, date=one)
+        )
+        truncated = truncated or page["truncated"]
+        for row in page["tournaments"]:
+            found.setdefault(row["id"], row)
+
+    tournaments = list(found.values())
+    if enrich:
+        for row in tournaments:
+            detail = parse_tournament(
+                _client.get_html("/tournaments/", {"id": row["id"]}), row["id"]
+            )
+            row["date"] = detail["date"]
+            row["address"] = detail["address"]
+            row["participants"] = detail["participants_count"]
+
+    return {
+        "total_found": len(tournaments),
+        "truncated": truncated,
+        "tournaments": tournaments,
+    }
 
 
 @mcp.tool()
