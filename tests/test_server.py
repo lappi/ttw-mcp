@@ -291,3 +291,102 @@ def test_mirror_mismatch_is_loud(stub_multi, load_fixture):
     )
     with pytest.raises(ToolError, match="ParseError"):
         server.get_tournament_matches("6ad412a")
+
+
+def test_series_merges_page_and_participants(stub_multi, load_fixture):
+    stub_multi(
+        {
+            "6ad412a": load_fixture("tournament.html"),
+            "1c18ed8": load_fixture("player_novice.html"),
+            "17828c3": load_fixture("player_participant.html"),
+        }
+    )
+    result = server.get_series("6ad412a", limit=10)
+    assert result["title"] == "Санкт Петербург. Турнир Энерджи Арена."
+    assert result["events_found"] == 9
+    assert [e["id"] for e in result["events"]] == [
+        "5f73688",
+        "6ad412a",
+        "6705776",
+        "6406361",
+        "423f3e9",
+        "7de1a9d",
+        "79a8c89",
+        "5f86873",
+        "6a98dbd",
+    ]
+    assert len(result["missing_profiles"]) == 15
+
+
+def test_series_recovers_events_the_site_list_omits(stub_multi, load_fixture):
+    # Список на странице кончается июлем, а сентябрьские турниры серии
+    # лежат только в профилях участников — и написаны иначе: без точки в
+    # конце и с пробелом перед ней. Точное сравнение названий потеряло бы
+    # именно свежие турниры, ради которых инструмент и нужен.
+    stub_multi(
+        {
+            "6ad412a": load_fixture("tournament.html"),
+            "1c18ed8": load_fixture("player_novice.html"),
+            "17828c3": load_fixture("player_participant.html"),
+        }
+    )
+    result = server.get_series("6ad412a")
+    from_profiles = {e["id"] for e in result["events"] if e["source"] == "participants"}
+    assert from_profiles == {"5f73688", "6ad412a", "6705776", "6406361"}
+    newest = result["events"][0]
+    assert newest["id"] == "5f73688" and newest["source"] == "participants"
+
+
+def test_series_events_have_one_shape(stub_multi, load_fixture):
+    # У записи из профиля нет адреса и числа участников, но ключи есть и
+    # равны null: иначе модель не отличит «поля нет» от «значение пустое».
+    stub_multi(
+        {
+            "6ad412a": load_fixture("tournament.html"),
+            "1c18ed8": load_fixture("player_novice.html"),
+        }
+    )
+    result = server.get_series("6ad412a")
+    shapes = {tuple(sorted(e)) for e in result["events"]}
+    assert len(shapes) == 1
+    from_page = next(e for e in result["events"] if e["source"] == "page")
+    from_profile = next(e for e in result["events"] if e["source"] == "participants")
+    assert from_page["participants"] is not None
+    assert from_profile["participants"] is None
+
+
+def test_series_limit_truncates_but_reports_the_whole(stub_multi, load_fixture):
+    stub_multi(
+        {
+            "6ad412a": load_fixture("tournament.html"),
+            "1c18ed8": load_fixture("player_novice.html"),
+            "17828c3": load_fixture("player_participant.html"),
+        }
+    )
+    result = server.get_series("6ad412a", limit=3)
+    assert len(result["events"]) == 3
+    assert result["events_found"] == 9
+
+
+def test_series_rejects_a_non_positive_limit(stub, load_fixture):
+    client = stub(load_fixture("tournament.html"))
+    with pytest.raises(ToolError, match="limit"):
+        server.get_series("6ad412a", limit=0)
+    assert client.calls == []
+
+
+@pytest.mark.parametrize(
+    "left,right",
+    [
+        ("Город. Турнир Имени Кого-то.", "Город. Турнир Имени Кого-то"),
+        ("Город . Турнир Имени Кого-то", "Город. Турнир Имени Кого-то"),
+        ("Город.  Турнир  Имени Кого-то ", "Город. Турнир Имени Кого-то"),
+        ("ГОРОД. Турнир Имени Кого-то", "город. турнир имени кого-то"),
+    ],
+)
+def test_series_key_unifies_the_measured_spellings(left, right):
+    assert server._series_key(left) == server._series_key(right)
+
+
+def test_series_key_keeps_different_series_apart():
+    assert server._series_key("Город. Турнир А") != server._series_key("Город. Турнир Б")

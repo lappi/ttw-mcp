@@ -29,6 +29,8 @@ _client = TtwClient()
 _ID = re.compile(r"[0-9a-f]{4,16}")
 _DATE = re.compile(r"[0-9]{2}\.[0-9]{2}\.[0-9]{4}")
 _ISO_DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
+_SERIES_SPACE = re.compile(r"\s+")
+_SERIES_PUNCT = re.compile(r"\s*([.,])\s*")
 
 
 def _reporting(fn):
@@ -61,6 +63,35 @@ def _valid_name(value: str, field: str) -> str:
     if not cleaned:
         raise InvalidInput(f"{field} не может быть пустым")
     return cleaned
+
+
+def _series_key(title: str) -> str:
+    """Ключ для сличения названий турниров одной серии.
+
+    Организаторы пишут название неединообразно: то с точкой в конце, то
+    без, то с пробелом перед точкой. Замерено на трёх профилях: точное
+    равенство находит один турнир серии из четырёх. Сравниваются
+    названия без регистра, без лишних пробелов и без хвостовой пунктуации.
+
+    Совпадение по названию остаётся эвристикой, и она скорее недоберёт,
+    чем додумает: разные серии с почти одинаковыми названиями слить
+    можно, но таких в замерах нет, а вот одна серия под тремя написаниями
+    встретилась сразу.
+    """
+    key = _SERIES_SPACE.sub(" ", title).strip().casefold()
+    return _SERIES_PUNCT.sub(r"\1", key).rstrip(".,")
+
+
+def _series_event(source: str, event_id: str, date: str, page: dict | None = None) -> dict:
+    return {
+        "id": event_id,
+        "date": date,
+        "source": source,
+        "address": page["address"] if page else None,
+        "organizers": page["organizers"] if page else None,
+        "participants": page["participants"] if page else None,
+        "games": page["games"] if page else None,
+    }
 
 
 @mcp.tool()
@@ -293,6 +324,75 @@ def get_tournament_matches(tournament_id: str) -> dict:
         "date": date,
         "participants": tournament["participants_count"],
         "matches": matches,
+        "missing_profiles": missing,
+    }
+
+
+@mcp.tool()
+@_reporting
+def get_series(tournament_id: str, limit: int = 10) -> dict:
+    """Турниры той же серии, включая запрошенный.
+
+    Собственный список сайта ненадёжен: он возвращает то записи
+    многолетней давности без свежих, то пустоту вовсе. Поэтому серия
+    собирается из двух источников — списка на странице турнира и
+    турниров с тем же названием из профилей участников, — и каждая
+    запись помечена полем source: "page" или "participants".
+
+    Запрошенный турнир в списке на странице отсутствует: там только
+    другие турниры серии. Но он попадает в выдачу из профилей
+    участников — его название совпадает само с собой. Это не ошибка:
+    турнир — часть собственной серии, и молча убирать его было бы
+    маленькой ложью.
+
+    Совпадение по названию — эвристика: сравнение идёт по
+    нормализованному ключу (без регистра, лишних пробелов и хвостовой
+    точки или запятой), а не по точному равенству, — организаторы пишут
+    названия неединообразно, то с точкой в конце, то без, то с пробелом
+    перед ней. Даже с нормализацией это остаётся эвристикой, и она
+    настроена скорее недобрать серию, чем додумать лишнее: слияние двух
+    разных серий с почти одинаковыми названиями теоретически возможно,
+    но в замерах не встретилось, а вот одна серия под тремя написаниями —
+    встретилась сразу.
+
+    Записи из профилей несут только id, date и source: address,
+    organizers, participants и games у них равны null, а не отсутствуют
+    — иначе не отличить «поля нет» от «значение пустое».
+
+    Загружает профиль каждого участника турнира, запросы идут строго
+    последовательно, поэтому цена — столько же запросов к сайту, сколько
+    участников в составе.
+    """
+    if limit < 1:
+        raise InvalidInput(f"limit должен быть положительным, получено {limit}")
+    html = _client.get_html(
+        "/tournaments/", {"id": _valid_id(tournament_id, "tournament_id")}
+    )
+    tournament = parse_tournament(html, tournament_id)
+    key = _series_key(tournament["title"])
+
+    events: dict[str, dict] = {}
+    for entry in tournament["series"]:
+        events[entry["id"]] = _series_event("page", entry["id"], entry["date"], entry)
+
+    ids = [row["player_id"] for row in tournament["standings"]]
+    profiles, missing = collect_profiles(_client, ids, include_matches=False)
+    for profile in profiles.values():
+        for played in profile["tournaments"]:
+            if _series_key(played["title"]) != key:
+                continue
+            if played["tournament_id"] in events:
+                continue
+            events[played["tournament_id"]] = _series_event(
+                "participants", played["tournament_id"], played["date"]
+            )
+
+    ordered = sorted(events.values(), key=lambda e: e["date"], reverse=True)
+    return {
+        "tournament_id": tournament_id,
+        "title": tournament["title"],
+        "events": ordered[:limit],
+        "events_found": len(ordered),
         "missing_profiles": missing,
     }
 
