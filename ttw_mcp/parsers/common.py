@@ -18,7 +18,9 @@ _NUMBER = re.compile(r"[+-]?\d+(?:\.\d+)?")
 _WIN_LOSS = re.compile(r"(\d+)\s*-\s*(\d+)")
 _SCORE = re.compile(r"^(\d+):(\d+)$")
 _ID = re.compile(r"[?&]id=([0-9a-f]+)")
-_WALKOVER = "W:Тех"
+_WALKOVER_WIN = frozenset({"W:Тех", "W:L"})
+_WALKOVER_LOSS = frozenset({"Тех:W", "L:W"})
+_NOT_PLAYED = "0:0"
 
 
 def clean(text: str) -> str:
@@ -57,24 +59,31 @@ def parse_win_loss(text: str) -> tuple[int, int]:
 
 
 def parse_score(raw: str) -> tuple[int | None, int | None, str]:
-    """Счёт матча. Техническую победу сайт пишет как "W:Тех", без партий.
+    """Счёт матча и его исход.
 
-    Возвращает (партии за, партии против, исход). Обычный счёт даёт "win" или
-    "loss"; "W:Тех" — "walkover"; всё, что не опознано, — "unparsed" с
-    сохранённым исходным текстом в score_raw у вызывающего.
+    Сайт пишет технический результат четырьмя способами, по-разному для
+    победившей и проигравшей стороны, и отдельно помечает несыгранный матч
+    счётом 0:0 с нулевой дельтой. Все формы замерены на выборке в 4621 матч.
 
-    Разделять walkover и unparsed обязательно: иначе смена разделителя на
-    сайте превратила бы все матчи в технические победы и обнулила счёт побед,
-    и заметить это было бы нечем. Встречается и в списке матчей профиля, и в
-    очных встречах, поэтому живёт здесь, а не в одном парсере.
+    Возвращает (партии за, партии против, исход). Для технического результата
+    и несыгранного матча партии равны None, а исходная запись сайта сохраняется
+    вызывающим в score_raw.
+
+    Исход "unparsed" означает форму, которой в замерах не было, то есть
+    действительно изменившуюся вёрстку — в отличие от прежней версии, где
+    туда попадали обычные технические поражения.
     """
+    if raw == _NOT_PLAYED:
+        return None, None, "not_played"
+    if raw in _WALKOVER_WIN:
+        return None, None, "walkover_win"
+    if raw in _WALKOVER_LOSS:
+        return None, None, "walkover_loss"
     match = _SCORE.match(raw)
-    if match is not None:
-        score_for, score_against = int(match.group(1)), int(match.group(2))
-        return score_for, score_against, "win" if score_for > score_against else "loss"
-    if raw == _WALKOVER:
-        return None, None, "walkover"
-    return None, None, "unparsed"
+    if match is None:
+        return None, None, "unparsed"
+    score_for, score_against = int(match.group(1)), int(match.group(2))
+    return score_for, score_against, "win" if score_for > score_against else "loss"
 
 
 def extract_id(href: str) -> str:

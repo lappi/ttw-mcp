@@ -97,7 +97,7 @@ def test_walkover_match_is_kept_not_dropped(veteran):
     # Техническую победу сайт пишет как "W:Тех" вместо счёта. Матч сыгран, у
     # него есть соперник и дельта, поэтому он остаётся в списке: исчезнув
     # молча, он занизил бы любой подсчёт игр, и заметить это было бы нечем.
-    walkovers = [m for m in veteran["matches"] if m["result"] == "walkover"]
+    walkovers = [m for m in veteran["matches"] if m["result"] == "walkover_win"]
     assert len(walkovers) == 1
     only = walkovers[0]
     assert only["score_raw"] == "W:Тех"

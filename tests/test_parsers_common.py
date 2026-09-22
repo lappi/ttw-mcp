@@ -53,12 +53,19 @@ def test_parse_win_loss_splits_pair():
     [
         ("3:1", (3, 1, "win")),
         ("0:2", (0, 2, "loss")),
-        ("W:Тех", (None, None, "walkover")),
+        ("W:Тех", (None, None, "walkover_win")),
+        ("W:L", (None, None, "walkover_win")),
+        ("Тех:W", (None, None, "walkover_loss")),
+        ("L:W", (None, None, "walkover_loss")),
+        ("0:0", (None, None, "not_played")),
         ("3-1", (None, None, "unparsed")),
         ("", (None, None, "unparsed")),
     ],
 )
-def test_parse_score_handles_walkover(raw, expected):
+def test_parse_score_knows_every_observed_form(raw, expected):
+    # Четыре формы технического результата и «не сыгран» замерены на 4621
+    # матче. Раньше три из них уходили в unparsed, и докстринг отправлял
+    # пользователя искать изменившуюся вёрстку там, где её не было.
     assert parse_score(raw) == expected
 
 
