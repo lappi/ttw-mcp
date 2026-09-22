@@ -136,7 +136,7 @@ C#/AngleSharp, парсящий тот же сайт с 2023 года. Он ре
 ttw-mcp/
   ttw_mcp/
     __init__.py
-    server.py     FastMCP, определения пяти инструментов
+    server.py     MCPServer, определения пяти инструментов
     client.py     HTTP-доступ: UA, таймаут, ретрай, сериализация
     parsers.py    чистые функции: HTML-строка -> dict
   tests/
@@ -147,8 +147,8 @@ ttw-mcp/
   README.md
 ```
 
-Стек: Python 3.11+, `mcp[cli]` (FastMCP, транспорт stdio), `httpx`,
-`beautifulsoup4` на стандартном `html.parser`. `lxml` не берём: он тянет
+Стек: Python 3.11+, `mcp[cli]` >=2.0 (`MCPServer`, транспорт stdio),
+`httpx`, `beautifulsoup4` на стандартном `html.parser`. `lxml` не берём: он тянет
 сборку и ломается на свежих Python, а объёмы здесь такие, что скорость
 парсера не важна.
 
