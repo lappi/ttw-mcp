@@ -15,6 +15,7 @@ from ttw_mcp.parsers.common import (
     parse_number,
     parse_score,
     require,
+    split_hand,
     text_of,
 )
 
@@ -79,8 +80,10 @@ def parse_head_to_head(html: str, player_id: str, opponent_id: str) -> dict:
     wins, win_pct = _block(soup, 0, "Победы")
     sets, sets_pct = _block(soup, 1, "Партии")
 
-    player_name = text_of(names[0])
-    opponent_name = text_of(names[2])
+    player_name_raw = text_of(names[0])
+    opponent_name_raw = text_of(names[2])
+    player_name, player_hand = split_hand(player_name_raw)
+    opponent_name, opponent_hand = split_hand(opponent_name_raw)
 
     matches = []
     for item in soup.select("div.game-item-block"):
@@ -102,11 +105,14 @@ def parse_head_to_head(html: str, player_id: str, opponent_id: str) -> dict:
         # Сайт ставит слева игрока из id, справа — из with; проверено на
         # 11 очных матчах двух разных пар. Сверяем явно: перевернись порядок
         # однажды, счёт поменялся бы местами молча, а так парсер остановится.
-        if text_of(details[0]) != player_name:
+        # Сравнение идёт по сырому тексту (с пометкой руки, если она есть) —
+        # обе стороны рендерятся сайтом одинаково, поэтому сверять их можно
+        # до вырезания пометки.
+        if text_of(details[0]) != player_name_raw:
             raise ParseError(
                 PARSER,
                 "div.game-item-details > div:first-child",
-                f"слева ожидался {player_name!r}, получено {text_of(details[0])!r}",
+                f"слева ожидался {player_name_raw!r}, получено {text_of(details[0])!r}",
             )
         raw_score = text_of(details[1])
         score_for, score_against, _ = parse_score(raw_score)
@@ -125,12 +131,14 @@ def parse_head_to_head(html: str, player_id: str, opponent_id: str) -> dict:
         "player": {
             "id": player_id,
             "name": player_name,
+            "hand": player_hand,
             "current_rating": player_rating,
             "rank": player_rank,
         },
         "opponent": {
             "id": opponent_id,
             "name": opponent_name,
+            "hand": opponent_hand,
             "current_rating": opponent_rating,
             "rank": opponent_rank,
         },

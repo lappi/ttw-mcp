@@ -68,6 +68,14 @@ def test_non_positive_limit_is_rejected(load_fixture, bad):
         parse_player_search(load_fixture("search_players_many.html"), limit=bad)
 
 
+def test_hand_marker_is_split_out_of_the_name(load_fixture):
+    result = parse_player_search(load_fixture("search_players_many.html"), limit=200)
+    with_hand = [p for p in result["players"] if p["hand"]]
+    assert with_hand, "в этой выдаче есть игрок с пометкой руки"
+    assert all("(" not in p["name"] for p in with_hand)
+    assert all(p["hand"] in ("левая", "правая") for p in with_hand)
+
+
 def test_tournament_search_parses_ajax_divs(load_fixture):
     result = parse_tournament_search(load_fixture("search_tournaments.html"))
     assert result["total_found"] == TOURNAMENT_SEARCH_CAP

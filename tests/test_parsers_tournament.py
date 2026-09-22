@@ -42,6 +42,14 @@ def test_last_place_row_fields(tournament):
     assert last["delta"] == pytest.approx(-5.22)
 
 
+def test_hand_marker_in_standings(load_fixture):
+    t = parse_tournament(load_fixture("tournament.html"), "6ad412a")
+    with_hand = [r for r in t["standings"] if r["hand"]]
+    assert len(with_hand) == 1
+    assert with_hand[0]["hand"] == "левая"
+    assert not with_hand[0]["name"].endswith("левая")
+
+
 def test_series_lists_other_editions_with_ids(tournament):
     series = tournament["series"]
     assert len(series) == 5

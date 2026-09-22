@@ -18,6 +18,7 @@ from ttw_mcp.parsers.common import (
     parse_score,
     parse_win_loss,
     require,
+    split_hand,
     text_of,
 )
 
@@ -112,6 +113,7 @@ def _parse_all_games(page) -> tuple[list, list, list]:
         if score_cell is not None:
             link = require(row.select_one("td.game-name-cell a"), "td.game-name-cell a", PARSER)
             name, rating = _split_name_rating(text_of(link))
+            opponent_name, opponent_hand = split_hand(name)
             raw_score = text_of(score_cell)
             score_for, score_against, result = parse_score(raw_score)
             matches.append(
@@ -124,7 +126,8 @@ def _parse_all_games(page) -> tuple[list, list, list]:
                     "score_against": score_against,
                     "result": result,
                     "opponent_id": extract_id(link["href"]),
-                    "opponent_name": name,
+                    "opponent_name": opponent_name,
+                    "opponent_hand": opponent_hand,
                     "opponent_rating": rating,
                     "delta": parse_number(text_of(row.select_one("td.game-delta-cell"))),
                 }
@@ -155,7 +158,8 @@ def _parse_best_wins(page) -> list[dict]:
         if score_cell is not None:
             names = row.select("td.player-name-cell")
             _, own_rating = _split_name_rating(text_of(names[0]))
-            opponent_name, opponent_rating = _split_name_rating(text_of(names[1]))
+            opponent_name_rated, opponent_rating = _split_name_rating(text_of(names[1]))
+            opponent_name, opponent_hand = split_hand(opponent_name_rated)
             raw_score = text_of(score_cell)
             score_for, score_against, _ = parse_score(raw_score)
             best.append(
@@ -166,6 +170,7 @@ def _parse_best_wins(page) -> list[dict]:
                     "score_for": score_for,
                     "score_against": score_against,
                     "opponent_name": opponent_name,
+                    "opponent_hand": opponent_hand,
                     "opponent_rating": opponent_rating,
                     "delta": parse_number(text_of(row.select_one("td.player-game-delta-cell"))),
                 }
@@ -178,9 +183,10 @@ def parse_player_profile(html: str, player_id: str) -> dict:
     page = require(soup.select_one("div.player-page"), "div.player-page", PARSER)
     name_node = require(page.select_one("h1 span"), "div.player-page h1 span", PARSER)
 
-    name = text_of(name_node)
-    if not name:
+    raw_name = text_of(name_node)
+    if not raw_name:
         raise NotFound(f"игрок {player_id} не найден на r.ttw.ru")
+    name, hand = split_hand(raw_name)
 
     rating_node = page.select_one("div.player-all-games th.rating-rating-cell")
     if rating_node is None:
@@ -194,6 +200,7 @@ def parse_player_profile(html: str, player_id: str) -> dict:
     return {
         "player_id": player_id,
         "name": name,
+        "hand": hand,
         "city": city,
         "current_rating": parse_number(text_of(rating_node)),
         "rank": parse_int(text_of(rank_node)),

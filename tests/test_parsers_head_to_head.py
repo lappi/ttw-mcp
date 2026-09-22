@@ -59,6 +59,13 @@ def test_walkover_in_head_to_head_is_kept(load_fixture):
     assert walkovers[0]["opponent_score"] is None
 
 
+def test_hand_field_present_and_unmarked_on_these_fixtures(h2h):
+    # На обеих фикстурах очных встреч пометки руки нет ни с одной стороны;
+    # поле всё равно присутствует и равно None, а не отсутствует в словаре.
+    assert h2h["player"]["hand"] is None
+    assert h2h["opponent"]["hand"] is None
+
+
 def test_broken_markup_raises_parse_error():
     with pytest.raises(ParseError):
         parse_head_to_head("<html><body>пусто</body></html>", "a", "b")

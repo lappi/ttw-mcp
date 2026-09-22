@@ -195,3 +195,32 @@ def test_not_played_is_separated_from_losses(load_fixture):
     assert len(void) == 2
     assert all(m["score_raw"] == "0:0" for m in void)
     assert all(m["delta"] == 0.0 for m in void)
+
+
+def test_hand_marker_is_split_out_of_opponent_names(load_fixture):
+    # Двадцать одно вхождение из двадцати трёх живёт именно здесь, а не в поиске.
+    profile = parse_player_profile(load_fixture("player_walkover_loss.html"), "44d227e")
+    marked = [m for m in profile["matches"] if m["opponent_hand"]]
+    assert len(marked) == 14
+    assert sum(1 for m in marked if m["opponent_hand"] == "левая") == 8
+    assert sum(1 for m in marked if m["opponent_hand"] == "правая") == 6
+    assert all("(" not in m["opponent_name"] for m in marked)
+    assert all(m["opponent_hand"] in ("левая", "правая") for m in marked)
+
+
+def test_hand_marker_in_walkover_tech_matches(load_fixture):
+    profile = parse_player_profile(load_fixture("player_walkover_tech.html"), "23a3d0d")
+    marked = [m for m in profile["matches"] if m["opponent_hand"]]
+    assert len(marked) == 4
+    assert all(m["opponent_hand"] == "левая" for m in marked)
+    assert all("(" not in m["opponent_name"] for m in marked)
+
+
+def test_hand_marker_absent_from_own_name_and_best_wins(novice, veteran, load_fixture):
+    # На всех четырёх профилях пометка руки не встречается ни в собственном
+    # имени игрока, ни в блоке «Лучшие победы» — только в списке матчей.
+    loss = parse_player_profile(load_fixture("player_walkover_loss.html"), "44d227e")
+    tech = parse_player_profile(load_fixture("player_walkover_tech.html"), "23a3d0d")
+    for profile in (novice, veteran, loss, tech):
+        assert profile["hand"] is None
+        assert all(w.get("opponent_hand") is None for w in profile["best_wins"])

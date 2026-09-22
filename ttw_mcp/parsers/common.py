@@ -18,6 +18,8 @@ _NUMBER = re.compile(r"[+-]?\d+(?:\.\d+)?")
 _WIN_LOSS = re.compile(r"(\d+)\s*-\s*(\d+)")
 _SCORE = re.compile(r"^(\d+):(\d+)$")
 _ID = re.compile(r"[?&]id=([0-9a-f]+)")
+_HAND = re.compile(r"\b(левая|правая)\b(?:\s*/\s*|\s+)?(?:рук\w*)?", re.IGNORECASE)
+_EMPTY_GROUP = re.compile(r"\(\s*[/\s]*\)")
 _WALKOVER_WIN = frozenset({"W:Тех", "W:L"})
 _WALKOVER_LOSS = frozenset({"Тех:W", "L:W"})
 _NOT_PLAYED = "0:0"
@@ -99,6 +101,32 @@ def extract_id(href: str) -> str:
     if match is None:
         raise ParseError("extract_id", "?id=", f"получено {href!r}")
     return match.group(1)
+
+
+def split_hand(name: str) -> tuple[str, str | None]:
+    """Отделяет пометку руки от имени игрока.
+
+    Сайт заводит под нерабочую руку отдельный профиль с отдельным
+    идентификатором и помечает это прямо в имени — четырнадцатью разными
+    способами на выборке в 2835 имён: в скобках и без, с заглавной и строчной,
+    в конце имени и приклеенной к фамилии, со словом «рука» и с опечаткой
+    «руков». Оставлять пометку внутри имени значит мешать сравнение имён и
+    скрывать от потребителя, что игрок выступает нерабочей рукой с
+    существенно другим рейтингом.
+
+    Скобка у имени — свободная заметка, и рука лишь один из её элементов:
+    встречается «( левая/шипы)», где «шипы» описывают накладку. Поэтому
+    вырезается только сама пометка руки, а остаток заметки сохраняется.
+
+    Возвращает (имя без пометки, "левая" | "правая" | None).
+    """
+    match = _HAND.search(name)
+    if match is None:
+        return name, None
+    rest = name[: match.start()] + name[match.end() :]
+    rest = _EMPTY_GROUP.sub(" ", rest)
+    rest = re.sub(r"\(\s+", "(", rest)
+    return " ".join(rest.split()), match.group(1).lower()
 
 
 def require(node: T | None, selector: str, parser: str) -> T:
