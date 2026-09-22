@@ -14,7 +14,7 @@ from ttw_mcp.parsers.common import (
 
 
 def test_clean_collapses_whitespace_and_nbsp():
-    assert clean("  <игрок\xa0 A\n тестовый> ") == "<игрок A>"
+    assert clean("  один\xa0 два\n три ") == "один два три"
 
 
 @pytest.mark.parametrize(

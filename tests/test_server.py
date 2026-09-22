@@ -62,14 +62,15 @@ def test_get_player_requests_right_url_and_parses(stub, load_fixture):
     client = stub(load_fixture("player_novice.html"))
     result = server.get_player("1c18ed8")
     assert client.calls == [("GET", "/players/", {"id": "1c18ed8"})]
-    assert result["name"] == "<игрок A>"
+    assert result["player_id"] == "1c18ed8"
+    assert result["name"]
     assert len(result["matches"]) == 16
 
 
 def test_search_players_passes_limit(stub, load_fixture):
-    stub(load_fixture("search_players_two.html"))
+    stub(load_fixture("search_players_many.html"))
     result = server.search_players("фомин", limit=1)
-    assert result["total_found"] == 2
+    assert result["total_found"] == 177
     assert len(result["players"]) == 1
 
 
@@ -77,7 +78,8 @@ def test_head_to_head_requests_with_parameter(stub, load_fixture):
     client = stub(load_fixture("head_to_head.html"))
     result = server.get_head_to_head("1c18ed8", "17828c3")
     assert client.calls == [("GET", "/players/", {"id": "1c18ed8", "with": "17828c3"})]
-    assert result["opponent"]["name"] == "<игрок D>"
+    assert result["opponent"]["id"] == "17828c3"
+    assert result["opponent"]["name"]
 
 
 def test_get_tournament_parses(stub, load_fixture):

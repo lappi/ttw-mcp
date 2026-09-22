@@ -16,7 +16,7 @@ def test_metadata(tournament):
     assert tournament["title"] == "Санкт Петербург. Турнир Энерджи Арена."
     assert tournament["date"] == "2026-09-13"
     assert tournament["address"] == "Санкт Петербург. Спб Парголово Дорога в Каменку 12"
-    assert tournament["organizers"] == "<организатор>"
+    assert tournament["organizers"]
     assert tournament["participants_count"] == 17
     assert tournament["games_count"] == 82
 
@@ -24,8 +24,8 @@ def test_metadata(tournament):
 def test_standings_complete(tournament):
     assert len(tournament["standings"]) == 17
     assert tournament["standings"][0]["place"] == 1
-    assert tournament["standings"][0]["name"] == "<игрок H>"
-    assert tournament["standings"][0]["rating"] == pytest.approx(201.70)
+    assert tournament["standings"][0]["player_id"] == "7063200"
+    assert tournament["standings"][0]["rating"] == pytest.approx(195.96)
     assert tournament["standings"][0]["delta"] == pytest.approx(5.03)
 
 
@@ -33,12 +33,12 @@ def test_last_place_row_fields(tournament):
     last = tournament["standings"][-1]
     assert last["place"] == 17
     assert last["player_id"] == "1c18ed8"
-    assert last["name"] == "<игрок A>"
+    assert last["name"]
     assert last["city"] == "--, -Санкт-Петербург"
     assert last["games"] == 9
     assert last["wins"] == 0
     assert last["losses"] == 9
-    assert last["rating"] == pytest.approx(84.78)
+    assert last["rating"] == pytest.approx(84.48)
     assert last["delta"] == pytest.approx(-5.22)
 
 

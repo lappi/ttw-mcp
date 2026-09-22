@@ -1,13 +1,13 @@
 import pytest
 
 CASES = [
-    ("player_novice.html", "<игрок A>"),
-    ("player_veteran.html", "<игрок B>"),
+    ("player_novice.html", "1c18ed8"),
+    ("player_veteran.html", 'class="player-game-tournament-cell"'),
     ("player_not_found.html", 'class="layout-row player-page"'),
     ("head_to_head.html", "Противостояние"),
     ("head_to_head_walkover.html", "W:Тех"),
     ("tournament.html", "Санкт Петербург. Турнир Энерджи Арена"),
-    ("search_players_two.html", "1c18ed8"),
+    ("search_players_many.html", "104aa33"),
     ("search_players_capped.html", "player-name-cell"),
     ("search_tournaments.html", "/tournaments/?id="),
     ("head_to_head_never_met.html", "Противостояние"),

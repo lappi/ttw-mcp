@@ -25,7 +25,7 @@ PAGES = [
     ("head_to_head.html", "GET", "/players/", {"id": "1c18ed8", "with": "17828c3"}),
     ("head_to_head_walkover.html", "GET", "/players/", {"id": "66f1645", "with": "730eb6d"}),
     ("tournament.html", "GET", "/tournaments/", {"id": "6ad412a"}),
-    ("search_players_two.html", "GET", "/players/", {"player-name": "фомин"}),
+    ("search_players_many.html", "GET", "/players/", {"player-name": "фомин"}),
     ("search_players_capped.html.gz", "GET", "/players/", {"player-name": "иванов"}),
     (
         "search_tournaments.html",

@@ -11,17 +11,17 @@ def h2h(load_fixture):
 
 def test_both_sides_identified(h2h):
     assert h2h["player"]["id"] == "1c18ed8"
-    assert h2h["player"]["name"] == "<игрок A>"
+    assert h2h["player"]["name"]
     assert h2h["opponent"]["id"] == "17828c3"
-    assert h2h["opponent"]["name"] == "<игрок D>"
+    assert h2h["opponent"]["name"]
 
 
 def test_ratings_and_ranks(h2h):
     # На этой странице рейтинг округлён до целого — два знака она не даёт.
     assert h2h["player"]["current_rating"] == pytest.approx(84.0)
-    assert h2h["player"]["rank"] == 91380
+    assert h2h["player"]["rank"] == 91485
     assert h2h["opponent"]["current_rating"] == pytest.approx(70.0)
-    assert h2h["opponent"]["rank"] == 95980
+    assert h2h["opponent"]["rank"] == 96020
 
 
 def test_win_and_set_counts(h2h):
@@ -43,13 +43,15 @@ def test_mutual_matches(h2h):
 
 
 def test_walkover_in_head_to_head_is_kept(load_fixture):
-    # <игрок B> против <игрок E>: три встречи, одна присуждена технически.
+    # 66f1645 против 730eb6d: три встречи, одна присуждена технически.
     # Раньше int("W") здесь падал, и это была не гипотеза — страница живая.
     h2h = parse_head_to_head(
         load_fixture("head_to_head_walkover.html"), "66f1645", "730eb6d"
     )
-    assert h2h["player"]["name"] == "<игрок B>"
-    assert h2h["opponent"]["name"] == "<игрок E>"
+    assert h2h["player"]["id"] == "66f1645"
+    assert h2h["player"]["name"]
+    assert h2h["opponent"]["id"] == "730eb6d"
+    assert h2h["opponent"]["name"]
     assert len(h2h["matches"]) == 3
     walkovers = [m for m in h2h["matches"] if m["score_raw"] == "W:Тех"]
     assert len(walkovers) == 1
@@ -68,5 +70,7 @@ def test_players_who_never_met_give_empty_matches(load_fixture):
     h2h = parse_head_to_head(load_fixture("head_to_head_never_met.html"), "1c18ed8", "7063200")
     assert h2h["matches"] == []
     assert h2h["wins"] == {"player": 0, "opponent": 0}
-    assert h2h["player"]["name"] == "<игрок A>"
-    assert h2h["opponent"]["name"] == "<игрок H>"
+    assert h2h["player"]["id"] == "1c18ed8"
+    assert h2h["player"]["name"]
+    assert h2h["opponent"]["id"] == "7063200"
+    assert h2h["opponent"]["name"]

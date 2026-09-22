@@ -22,14 +22,15 @@ def client():
 def test_live_player_profile_still_parses(client):
     html = client.get_html("/players/", {"id": "1c18ed8"})
     profile = parse_player_profile(html, "1c18ed8")
-    assert profile["name"] == "<игрок A>"
+    assert profile["player_id"] == "1c18ed8"
+    assert profile["name"]
     assert profile["matches"], "матчей нет — вероятно, изменились классы game-*"
 
 
 def test_live_search_still_parses(client):
     html = client.get_html("/players/", {"player-name": "фомин"})
     result = parse_player_search(html, limit=25)
-    assert result["total_found"] >= 2
+    assert result["total_found"] >= 50
 
 
 def test_live_tournament_still_parses(client):
