@@ -26,6 +26,9 @@ def parse_player_search(html: str, limit: int) -> dict:
 
     players = []
     for row in rows[:limit]:
+        # В ячейке имени две ссылки на одного игрока: первая оборачивает
+        # аватар, вторая несёт ФИО. Простое "a" выбрало бы картинку и вернуло
+        # пустое имя, поэтому ссылку с изображением отсекаем.
         link = row.select_one("td.player-name-cell a:not(:has(img))")
         stat = text_of(row.select_one("td.player-stat-cell"))
         wins, losses = parse_win_loss(stat)
@@ -52,6 +55,16 @@ def parse_player_search(html: str, limit: int) -> dict:
 
 
 def parse_tournament_search(html: str) -> dict:
+    """Разбирает ответ ajax-действия get_tournaments_by_name.
+
+    Принимает ТОЛЬКО этот фрагмент: плоский список вида
+    <div><a href="/tournaments/?id=…">название</a></div> и ничего больше.
+
+    Отбор идёт по всем ссылкам документа, поэтому целую страницу сюда
+    передавать нельзя — любая ссылка с /tournaments/ в href, хоть из
+    навигации, хоть из бокового блока, попала бы в результат как найденный
+    турнир. Ограничение держится на вызывающей стороне, а не на коде.
+    """
     soup = BeautifulSoup(html, "html.parser")
     tournaments = [
         {"id": extract_id(link["href"]), "title": text_of(link)}
