@@ -223,4 +223,13 @@ def test_hand_marker_absent_from_own_name_and_best_wins(novice, veteran, load_fi
     tech = parse_player_profile(load_fixture("player_walkover_tech.html"), "23a3d0d")
     for profile in (novice, veteran, loss, tech):
         assert profile["hand"] is None
-        assert all(w.get("opponent_hand") is None for w in profile["best_wins"])
+        assert all(w["opponent_hand"] is None for w in profile["best_wins"])
+
+
+def test_hand_marker_count_on_veteran_and_novice_matches(novice, veteran):
+    # Поправка 5: обе фикстуры дают ровно одно совпадение, «левая».
+    for profile in (novice, veteran):
+        marked = [m for m in profile["matches"] if m["opponent_hand"]]
+        assert len(marked) == 1
+        assert marked[0]["opponent_hand"] == "левая"
+        assert "(" not in marked[0]["opponent_name"]

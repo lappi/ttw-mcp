@@ -121,6 +121,10 @@ def split_hand(name: str) -> tuple[str, str | None]:
     встречается «( левая/шипы)», где «шипы» описывают накладку. Поэтому
     вырезается только сама пометка руки, а остаток заметки сохраняется.
 
+    Вырожденный случай — имя, целиком состоящее из пометки («ЛЕВАЯ») —
+    трактуется как имя, а не как пометка: молчаливо возвращать пустое имя
+    для потребителя хуже, чем один раз не распознать пометку.
+
     Возвращает (имя без пометки, "левая" | "правая" | None).
     """
     match = _HAND.search(name)
@@ -129,7 +133,10 @@ def split_hand(name: str) -> tuple[str, str | None]:
     rest = name[: match.start()] + name[match.end() :]
     rest = _EMPTY_GROUP.sub(" ", rest)
     rest = re.sub(r"\(\s+", "(", rest)
-    return " ".join(rest.split()), match.group(1).lower()
+    cleaned = " ".join(rest.split())
+    if not cleaned:
+        return name, None
+    return cleaned, match.group(1).lower()
 
 
 def require(node: T | None, selector: str, parser: str) -> T:

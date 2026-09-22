@@ -59,9 +59,21 @@ def test_walkover_in_head_to_head_is_kept(load_fixture):
     assert walkovers[0]["opponent_score"] is None
 
 
-def test_hand_field_present_and_unmarked_on_these_fixtures(h2h):
-    # На обеих фикстурах очных встреч пометки руки нет ни с одной стороны;
-    # поле всё равно присутствует и равно None, а не отсутствует в словаре.
+@pytest.mark.parametrize(
+    "fixture_name,player_id,opponent_id",
+    [
+        ("head_to_head.html", "1c18ed8", "17828c3"),
+        ("head_to_head_walkover.html", "66f1645", "730eb6d"),
+        ("head_to_head_never_met.html", "1c18ed8", "7063200"),
+    ],
+)
+def test_hand_field_present_and_unmarked_on_these_fixtures(
+    load_fixture, fixture_name, player_id, opponent_id
+):
+    # На всех трёх фикстурах очных встреч пометки руки нет ни с одной
+    # стороны; поле всё равно присутствует и равно None, а не отсутствует
+    # в словаре.
+    h2h = parse_head_to_head(load_fixture(fixture_name), player_id, opponent_id)
     assert h2h["player"]["hand"] is None
     assert h2h["opponent"]["hand"] is None
 
