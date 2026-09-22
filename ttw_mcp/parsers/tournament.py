@@ -25,9 +25,16 @@ PARSER = "parse_tournament"
 
 
 def _meta_row(row) -> dict:
-    link = row.select_one("td.tournament-info-cell a")
+    # Ссылка здесь есть у каждой строки — и у самого турнира, и у всех строк
+    # серии: ячейка ради неё и существует. Её отсутствие означает не «турнира
+    # нет», а изменившуюся вёрстку, поэтому пустой id не выдумываем.
+    link = require(
+        row.select_one("td.tournament-info-cell a"),
+        "td.tournament-info-cell a",
+        PARSER,
+    )
     return {
-        "id": extract_id(link["href"]) if link else "",
+        "id": extract_id(link["href"]),
         "date": parse_date(text_of(row.select_one("td.tournament-date-cell"))),
         "address": text_of(row.select_one("td.tournament-address-cell")),
         "organizers": text_of(row.select_one("td.tournament-organizer-cell")),
