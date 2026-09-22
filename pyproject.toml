@@ -1,0 +1,25 @@
+[project]
+name = "ttw-mcp"
+version = "0.1.0"
+description = "MCP-сервер для рейтинга настольного тенниса r.ttw.ru"
+requires-python = ">=3.11"
+dependencies = [
+    "mcp[cli]>=1.4.1",
+    "httpx>=0.28",
+    "beautifulsoup4>=4.12",
+]
+
+[project.scripts]
+ttw-mcp = "ttw_mcp.server:main"
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["smoke: обращается к живому сайту, вручную"]
+addopts = "-m 'not smoke'"
