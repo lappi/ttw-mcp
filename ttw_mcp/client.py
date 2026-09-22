@@ -14,7 +14,7 @@ from ttw_mcp.errors import NotFound, UpstreamError
 
 class TtwClient:
     BASE_URL = "https://r.ttw.ru"
-    USER_AGENT = "ttw-mcp/0.1 (+https://github.com/cryptolappi/ttw-mcp)"
+    USER_AGENT = "ttw-mcp/0.1 (+https://github.com/lappi/ttw-mcp)"
     TIMEOUT = 30.0
     AJAX_PATH = "/wp-admin/admin-ajax.php"
 
