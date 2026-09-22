@@ -135,6 +135,32 @@ def _parse_all_games(page) -> tuple[list, list, list]:
     return periods, tournaments, matches
 
 
+def _seed(periods: list[dict], matches: list[dict]) -> tuple[float | None, str | None]:
+    """Стартовый рейтинг и дата первого обсчёта.
+
+    Восстанавливается как rating_after самого раннего периода минус его
+    дельта. Метод подтверждается округлостью: система сажает новичка на
+    целое число, и на выборке в 193 периода `rating_after − delta` целое
+    лишь в 2.6% случаев — но у всех проверенных самых ранних периодов оно
+    целое.
+
+    Потолок 30 в `rated_periods` на таблицу периодов не распространяется:
+    у профилей с 87 и 91 периодом она показана целиком. Поэтому здесь
+    потолок не проверяется.
+
+    Возвращает (None, None), если периодов нет вовсе или таблица периодов
+    доказуемо неполна — то есть в списке матчей есть матч раньше начала
+    самого раннего периода. Выдумывать стартовый рейтинг по не-первому
+    периоду нельзя: он будет правдоподобным и неверным.
+    """
+    if not periods:
+        return None, None
+    earliest = periods[-1]
+    if any(m["date"] < earliest["start"] for m in matches if m.get("date")):
+        return None, None
+    return round(earliest["rating_after"] - earliest["delta"], 2), earliest["start"]
+
+
 def _parse_best_wins(page) -> list[dict]:
     """Блок «Лучшие победы» использует другие классы и не даёт id соперника."""
     block = page.select_one("div.player-best-games")
@@ -197,6 +223,7 @@ def parse_player_profile(html: str, player_id: str) -> dict:
 
     periods, tournaments, matches = _parse_all_games(page)
     city, summary = _parse_summary(page, player_id)
+    summary["seed_rating"], summary["first_rated_date"] = _seed(periods, matches)
     return {
         "player_id": player_id,
         "name": name,

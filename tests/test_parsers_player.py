@@ -3,7 +3,7 @@ import re
 import pytest
 
 from ttw_mcp.errors import NotFound, ParseError
-from ttw_mcp.parsers.player import parse_player_profile
+from ttw_mcp.parsers.player import _seed, parse_player_profile
 
 
 @pytest.fixture
@@ -233,3 +233,43 @@ def test_hand_marker_count_on_veteran_and_novice_matches(novice, veteran):
         assert len(marked) == 1
         assert marked[0]["opponent_hand"] == "левая"
         assert "(" not in marked[0]["opponent_name"]
+
+
+def test_seed_rating_is_reconstructed_from_the_earliest_period(novice, veteran):
+    # rating_after самого раннего периода минус его дельта. Метод даёт
+    # круглые значения, что его и подтверждает: система сажает новичка
+    # на целое число.
+    assert novice["summary"]["seed_rating"] == pytest.approx(90.00)
+    assert novice["summary"]["first_rated_date"] == "2026-09-07"
+    assert veteran["summary"]["seed_rating"] == pytest.approx(115.00)
+    assert veteran["summary"]["first_rated_date"] == "2025-09-15"
+
+
+def test_seed_rating_survives_the_rated_periods_cap(load_fixture):
+    # У этих игроков rated_periods упёрлось в потолок 30, но таблица
+    # периодов показана целиком — 87 и 91 период, и ни одного матча
+    # раньше начала самого раннего из них. Стартовый рейтинг
+    # восстанавливается, и он целый, как и положено.
+    deep = parse_player_profile(load_fixture("player_walkover_loss.html"), "44d227e")
+    assert deep["summary"]["rated_periods"] == 30
+    assert len(deep["periods"]) == 87
+    assert deep["summary"]["seed_rating"] == pytest.approx(80.00)
+    assert deep["summary"]["first_rated_date"] == "2023-12-25"
+
+    tech = parse_player_profile(load_fixture("player_walkover_tech.html"), "23a3d0d")
+    assert tech["summary"]["rated_periods"] == 30
+    assert len(tech["periods"]) == 91
+    assert tech["summary"]["seed_rating"] == pytest.approx(50.00)
+    assert tech["summary"]["first_rated_date"] == "2024-05-27"
+
+
+def test_seed_is_unknown_without_periods():
+    assert _seed([], [{"date": "2024-01-01"}]) == (None, None)
+
+
+def test_seed_is_unknown_when_a_match_predates_the_earliest_period():
+    # Матч раньше начала самого раннего периода означает, что таблица
+    # периодов показана не целиком, и восстанавливать по ней нечего.
+    periods = [{"start": "2024-01-01", "end": "2024-01-07", "rating_after": 100.0, "delta": 10.0}]
+    assert _seed(periods, [{"date": "2023-12-31"}]) == (None, None)
+    assert _seed(periods, [{"date": "2024-01-02"}]) == (90.0, "2024-01-01")
