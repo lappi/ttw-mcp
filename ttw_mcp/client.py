@@ -40,19 +40,31 @@ class TtwClient:
         return self._send("POST", self.AJAX_PATH, data={"action": action, **fields})
 
     def _send(self, method: str, path: str, **kwargs) -> str:
+        # Полный адрес с параметрами: в сообщении об ошибке он нужен целиком,
+        # иначе непонятно, какой именно запрос не прошёл.
+        url = str(self._client.build_request(method, path, **kwargs).url)
         last: Exception | None = None
-        for attempt in range(2):  # один повтор, только на сетевую ошибку
+        for _ in range(2):  # один повтор, только на сетевую ошибку
             try:
                 response = self._client.request(method, path, **kwargs)
             except httpx.TransportError as exc:
                 last = exc
                 continue
+            except httpx.RequestError as exc:
+                # Цикл редиректов и битая кодировка лежат РЯДОМ с
+                # TransportError, а не под ним, и повтор их не лечит. Но выйти
+                # наружу они обязаны как UpstreamError: вызывающий ловит
+                # TtwError, и сырое httpx-исключение прошло бы мимо всей
+                # типизации ошибок.
+                raise UpstreamError(url, f"{type(exc).__name__}: {exc}") from exc
             if response.status_code == 404:
                 raise NotFound(f"{response.url} — страница не найдена")
             if response.status_code >= 400:
                 raise UpstreamError(str(response.url), f"HTTP {response.status_code}")
             return response.text
-        raise UpstreamError(f"{self._client.base_url}{path}", f"{last} (таймаут {self._timeout}s)")
+        raise UpstreamError(
+            url, f"{type(last).__name__}: {last} — две попытки, таймаут {self._timeout} с"
+        )
 
     def close(self) -> None:
         self._client.close()

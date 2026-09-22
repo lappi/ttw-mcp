@@ -73,9 +73,25 @@ def test_network_error_is_retried_exactly_once_then_raises():
         raise httpx.ConnectTimeout("нет связи")
 
     with make_client(handler) as client:
-        with pytest.raises(UpstreamError):
+        with pytest.raises(UpstreamError) as excinfo:
             client.get_html("/players/", {"id": "1c18ed8"})
     assert len(calls) == 2
+    # Причина называет настоящий тип сбоя, а не приписывает таймаут всему
+    # подряд, а адрес сохраняет параметры — иначе неясно, что именно упало.
+    assert "ConnectTimeout" in excinfo.value.reason
+    assert "id=1c18ed8" in excinfo.value.url
+
+
+def test_redirect_loop_becomes_upstream_error():
+    # TooManyRedirects — сосед TransportError, а не потомок: узкий except
+    # выпускал его наружу сырым, мимо типизации ошибок проекта.
+    def handler(request):
+        return httpx.Response(302, headers={"Location": "/loop"})
+
+    with make_client(handler) as client:
+        with pytest.raises(UpstreamError) as excinfo:
+            client.get_html("/loop", {})
+    assert "TooManyRedirects" in excinfo.value.reason
 
 
 def test_retry_succeeds_on_second_attempt():
