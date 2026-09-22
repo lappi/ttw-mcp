@@ -136,7 +136,7 @@ C#/AngleSharp, парсящий тот же сайт с 2023 года. Он ре
 ttw-mcp/
   ttw_mcp/
     __init__.py
-    server.py     FastMCP, определения пяти инструментов
+    server.py     MCPServer, определения пяти инструментов
     client.py     HTTP-доступ: UA, таймаут, ретрай, сериализация
     parsers.py    чистые функции: HTML-строка -> dict
   tests/
@@ -147,8 +147,8 @@ ttw-mcp/
   README.md
 ```
 
-Стек: Python 3.11+, `mcp[cli]` (FastMCP, транспорт stdio), `httpx`,
-`beautifulsoup4` на стандартном `html.parser`. `lxml` не берём: он тянет
+Стек: Python 3.11+, `mcp[cli]` >=2.0 (`MCPServer`, транспорт stdio),
+`httpx`, `beautifulsoup4` на стандартном `html.parser`. `lxml` не берём: он тянет
 сборку и ломается на свежих Python, а объёмы здесь такие, что скорость
 парсера не важна.
 
@@ -214,10 +214,20 @@ ttw-mcp/
 ```json
 {"date": "2026-09-20", "tournament_id": "5f73688",
  "tournament_title": "Санкт Петербург. Турнир Энерджи Арена",
- "score_for": 3, "score_against": 1, "result": "win",
+ "score_raw": "3:1", "score_for": 3, "score_against": 1, "result": "win",
  "opponent_id": "201fd1c", "opponent_name": "<игрок C>",
  "opponent_rating": 55.35, "delta": 1.41}
 ```
+
+Техническую победу сайт пишет как `W:Тех` вместо счёта. Такой матч
+возвращается наравне с остальными: `result` равен `walkover`, партии
+`null`, исходная запись — в `score_raw`. Выбрасывать его нельзя: игра
+состоялась, у неё есть соперник и дельта рейтинга.
+
+Поле `result` принимает значения `win`, `loss`, `walkover` и `unparsed`.
+Первые три — исходы матча; `unparsed` означает нераспознанный счёт
+(например, смену разделителя на сайте) и партии `null`, как у `walkover`,
+но означает изменившуюся вёрстку, а не исход игры.
 
 Докстринг обязан сообщать модели две вещи: данные охватывают последние
 12 месяцев, и `summary` отстаёт от `matches` на один недельный период
@@ -283,6 +293,7 @@ ttw-mcp/
 | Периоды рейтинга | `.rating-title-cell`, `.rating-rating-cell`, `.rating-delta-cell` |
 | Турнир в списке игрока | `.game-tournament-name-cell`, `.game-tournament-delta-cell` |
 | Таблица турнира | `.player-place-cell`, `.player-name-cell`, `.player-city-cell`, `.player-stat-cell`, `.player-rating-cell`, `.player-delta-cell` |
+| Имя в строке поиска | `.player-name-cell a:not(:has(img))` — в ячейке две ссылки, первая на аватаре |
 | Шапка турнира | `.tournament-date-cell`, `.tournament-address-cell`, `.tournament-organizer-cell`, `.tournament-num-players-cell`, `.tournament-num-games-cell`, `.tournament-info-cell` |
 | Противостояние | `.compare-block-*`, `.compare-rating`, `.compare-position` |
 
@@ -307,7 +318,8 @@ ttw-mcp/
 | Разметка изменилась, обязательный блок не найден | исключение `ParseError` с именем парсера и селектора |
 | Несуществующий id | сайт отдаёт либо 404, либо 200 с пустым профилем; оба случая дают явный `not_found` |
 | Нет матчей у нового игрока | валидный ответ с пустым списком, не ошибка |
-| Таймаут или сетевой сбой | один повтор, затем `UpstreamError` с указанием URL и таймаута |
+| Таймаут или сетевой сбой | один повтор, затем `UpstreamError` с полным URL и названием класса сбоя |
+| Цикл редиректов, битая кодировка | `UpstreamError` без повтора: эти классы лежат рядом с `TransportError`, а не под ним |
 | HTTP 4xx/5xx | `UpstreamError` с кодом, без повтора |
 | Пустое имя в `search_players` | `InvalidInput`, запрос не отправляется |
 | Достигнут потолок в 500 строк | успешный ответ с `truncated: true` |
