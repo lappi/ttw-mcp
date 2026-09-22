@@ -487,10 +487,25 @@ def test_date_and_range_together_are_refused(stub):
 
 def test_impossible_date_is_named_not_erased(stub):
     # Регулярка пропускает 99.99.2026; без явной проверки модель получила
-    # бы стёртое «Error executing tool» без причины.
+    # бы стёртое «Error executing tool» без причины. Проверяем не только
+    # переклассификацию в InvalidInput, но и сам текст причины, иначе
+    # регресс сообщения прошёл бы незамеченным.
     client = stub()
-    with pytest.raises(ToolError, match="InvalidInput"):
+    with pytest.raises(ToolError, match="не является датой"):
         server.search_tournaments(date_from="99.99.2026", date_to="99.99.2026")
+    assert client.calls == []
+
+
+def test_range_of_exactly_fourteen_days_is_accepted(stub, load_fixture):
+    client = stub(load_fixture("search_tournaments.html"))
+    server.search_tournaments(date_from="01.09.2026", date_to="14.09.2026")
+    assert len(client.calls) == 14
+
+
+def test_range_of_fifteen_days_is_refused(stub):
+    client = stub()
+    with pytest.raises(ToolError, match="15"):
+        server.search_tournaments(date_from="01.09.2026", date_to="15.09.2026")
     assert client.calls == []
 
 
@@ -512,3 +527,45 @@ def test_search_without_enrich_does_not_load_tournaments(stub_multi):
     result = server.search_tournaments(name="турнир")
     assert "date" not in result["tournaments"][0]
     assert client.calls == ["get_tournaments_by_name:"]
+
+
+def test_range_with_enrich_within_the_cap_still_enriches(stub_multi, load_fixture):
+    # Три дня отдают одну и ту же ссылку: после склейки по id остаётся одна
+    # строка, это меньше потолка обогащения, и запрос проходит целиком.
+    client = stub_multi({"6ad412a": load_fixture("tournament.html")})
+    client.ajax = '<div>1. <a href="/tournaments/?id=6ad412a">Турнир</a></div>'
+    result = server.search_tournaments(
+        date_from="01.09.2026", date_to="03.09.2026", enrich=True
+    )
+    assert result["total_found"] == 1
+    assert result["tournaments"][0]["participants"] == 17
+
+
+def test_range_with_enrich_over_the_cap_is_refused(monkeypatch):
+    # Два дня без пересечений по турнирам: после склейки строк больше
+    # потолка обогащения (20 + 2 = 22). Обогащение обязано отклониться
+    # целиком до первой загрузки турнира, а не обогатить первые двадцать.
+    class RangeStub:
+        def __init__(self):
+            self.calls = []
+
+        def post_ajax(self, action, **fields):
+            day = fields.get("date", "")
+            self.calls.append(f"{action}:{day}")
+            prefix = "a" if day == "01.09.2026" else "b"
+            return "".join(
+                f'<div>{i}. <a href="/tournaments/?id={prefix}{i:02x}">Турнир {prefix}{i}</a></div>'
+                for i in range(11)
+            )
+
+        def get_html(self, path, params):
+            raise AssertionError("обогащение не должно стартовать при превышении потолка")
+
+    client = RangeStub()
+    monkeypatch.setattr(server, "_client", client)
+    with pytest.raises(ToolError, match="22"):
+        server.search_tournaments(date_from="01.09.2026", date_to="02.09.2026", enrich=True)
+    assert client.calls == [
+        "get_tournaments_by_name:01.09.2026",
+        "get_tournaments_by_name:02.09.2026",
+    ]
