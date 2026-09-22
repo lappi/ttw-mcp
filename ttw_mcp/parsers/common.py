@@ -18,7 +18,10 @@ _NUMBER = re.compile(r"[+-]?\d+(?:\.\d+)?")
 _WIN_LOSS = re.compile(r"(\d+)\s*-\s*(\d+)")
 _SCORE = re.compile(r"^(\d+):(\d+)$")
 _ID = re.compile(r"[?&]id=([0-9a-f]+)")
-_HAND = re.compile(r"\b(левая|правая)\b(?:\s*/\s*|\s+)?(?:рук\w*)?", re.IGNORECASE)
+_HAND = re.compile(
+    r"\b(левая|правая)\b(?:\s*/\s*|\s+)?(?:рука|руки|рукой|руков)?\b",
+    re.IGNORECASE,
+)
 _EMPTY_GROUP = re.compile(r"\(\s*[/\s]*\)")
 _WALKOVER_WIN = frozenset({"W:Тех", "W:L"})
 _WALKOVER_LOSS = frozenset({"Тех:W", "L:W"})
