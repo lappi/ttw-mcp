@@ -13,7 +13,7 @@ from ttw_mcp.parsers.common import (
 
 
 def test_clean_collapses_whitespace_and_nbsp():
-    assert clean("  <игрок A>  Олег\n Валерьевич ") == "<игрок A>"
+    assert clean("  <игрок\xa0 A\n тестовый> ") == "<игрок A>"
 
 
 @pytest.mark.parametrize(
