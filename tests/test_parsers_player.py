@@ -273,3 +273,25 @@ def test_seed_is_unknown_when_a_match_predates_the_earliest_period():
     periods = [{"start": "2024-01-01", "end": "2024-01-07", "rating_after": 100.0, "delta": 10.0}]
     assert _seed(periods, [{"date": "2023-12-31"}]) == (None, None)
     assert _seed(periods, [{"date": "2024-01-02"}]) == (90.0, "2024-01-01")
+
+
+def test_matches_can_be_omitted_but_the_count_survives(load_fixture):
+    # 93 % объёма профиля — это matches. Но выкинуть их молча нельзя:
+    # модель не отличит «сыграл 12» от «показали 12 из 1891».
+    slim = parse_player_profile(
+        load_fixture("player_veteran.html"), "66f1645", include_matches=False
+    )
+    assert "matches" not in slim
+    assert "best_wins" not in slim
+    assert slim["matches_total"] == 106
+    assert slim["best_wins_total"] == 5
+    assert len(slim["periods"]) == 13
+
+
+def test_matches_since_filters_but_reports_the_whole(load_fixture):
+    recent = parse_player_profile(
+        load_fixture("player_veteran.html"), "66f1645", matches_since="2026-09-01"
+    )
+    assert recent["matches_total"] == 106
+    assert len(recent["matches"]) == 7
+    assert all(m["date"] >= "2026-09-01" for m in recent["matches"])

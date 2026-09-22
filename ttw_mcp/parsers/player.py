@@ -204,7 +204,13 @@ def _parse_best_wins(page) -> list[dict]:
     return best
 
 
-def parse_player_profile(html: str, player_id: str) -> dict:
+def parse_player_profile(
+    html: str,
+    player_id: str,
+    *,
+    include_matches: bool = True,
+    matches_since: str | None = None,
+) -> dict:
     soup = BeautifulSoup(html, "html.parser")
     page = require(soup.select_one("div.player-page"), "div.player-page", PARSER)
     name_node = require(page.select_one("h1 span"), "div.player-page h1 span", PARSER)
@@ -223,8 +229,13 @@ def parse_player_profile(html: str, player_id: str) -> dict:
 
     periods, tournaments, matches = _parse_all_games(page)
     city, summary = _parse_summary(page, player_id)
+    # _seed обязан получить полный, неотфильтрованный список: его защитная
+    # ветка сравнивает даты матчей с началом самого раннего периода и на
+    # урезанном списке молча перестанет срабатывать.
     summary["seed_rating"], summary["first_rated_date"] = _seed(periods, matches)
-    return {
+    best_wins = _parse_best_wins(page)
+
+    result = {
         "player_id": player_id,
         "name": name,
         "hand": hand,
@@ -234,6 +245,12 @@ def parse_player_profile(html: str, player_id: str) -> dict:
         "summary": summary,
         "periods": periods,
         "tournaments": tournaments,
-        "matches": matches,
-        "best_wins": _parse_best_wins(page),
     }
+    result["matches_total"] = len(matches)
+    result["best_wins_total"] = len(best_wins)
+    if include_matches:
+        if matches_since is not None:
+            matches = [m for m in matches if m["date"] >= matches_since]
+        result["matches"] = matches
+        result["best_wins"] = best_wins
+    return result

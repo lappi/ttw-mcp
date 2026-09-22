@@ -25,6 +25,7 @@ _client = TtwClient()
 # ушёл бы в запрос, нарушая правило «отказ до обращения к сети».
 _ID = re.compile(r"[0-9a-f]{4,16}")
 _DATE = re.compile(r"[0-9]{2}\.[0-9]{2}\.[0-9]{4}")
+_ISO_DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 
 
 def _reporting(fn):
@@ -80,7 +81,9 @@ def search_players(name: str, limit: int = 25) -> dict:
 
 @mcp.tool()
 @_reporting
-def get_player(player_id: str) -> dict:
+def get_player(
+    player_id: str, include_matches: bool = True, matches_since: str = ""
+) -> dict:
     """Возвращает профиль игрока: сводку, периоды рейтинга, турниры и все матчи.
 
     История не ограничена фиксированным окном: страница отдаёт все недельные
@@ -109,9 +112,23 @@ def get_player(player_id: str) -> dict:
 
     Неопознанный счёт приходит с result "unparsed" — это признак изменившейся
     вёрстки, а не результат матча.
+
+    Список matches — основной объём ответа. Если он не нужен, ставьте
+    include_matches=False: тогда ключи matches и best_wins в ответе
+    отсутствуют (а не пусты), но matches_total и best_wins_total
+    присутствуют всегда и считаются по полному списку. matches_since
+    (формат YYYY-MM-DD) сужает matches до матчей не раньше этой даты, не
+    трогая при этом matches_total — оно по-прежнему про весь список.
     """
+    since = matches_since.strip() or None
+    if since is not None and not _ISO_DATE.fullmatch(since):
+        raise InvalidInput(
+            f"matches_since должен быть в формате YYYY-MM-DD, получено {matches_since!r}"
+        )
     html = _client.get_html("/players/", {"id": _valid_id(player_id, "player_id")})
-    return parse_player_profile(html, player_id)
+    return parse_player_profile(
+        html, player_id, include_matches=include_matches, matches_since=since
+    )
 
 
 @mcp.tool()

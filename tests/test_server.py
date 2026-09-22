@@ -145,3 +145,17 @@ def test_errors_reach_the_model_through_mcp(stub):
     assert not isinstance(error, UnexpectedToolError)
     assert "InvalidInput" in str(error)
     assert "player_id" in str(error)
+
+
+def test_get_player_can_skip_matches(stub, load_fixture):
+    stub(load_fixture("player_veteran.html"))
+    result = server.get_player("66f1645", include_matches=False)
+    assert "matches" not in result
+    assert result["matches_total"] == 106
+
+
+def test_get_player_rejects_non_iso_since(stub):
+    client = stub()
+    with pytest.raises(ToolError, match="matches_since"):
+        server.get_player("66f1645", matches_since="13.09.2026")
+    assert client.calls == []
