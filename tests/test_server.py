@@ -4,6 +4,7 @@ import pytest
 from mcp.server.mcpserver.exceptions import ToolError, UnexpectedToolError
 
 from ttw_mcp import server
+from ttw_mcp.errors import NotFound
 
 
 class StubClient:
@@ -24,6 +25,27 @@ class StubClient:
 def stub(monkeypatch):
     def install(html: str = "") -> StubClient:
         client = StubClient(html)
+        monkeypatch.setattr(server, "_client", client)
+        return client
+
+    return install
+
+
+@pytest.fixture
+def stub_multi(monkeypatch):
+    def install(pages: dict[str, str]):
+        class MultiStub:
+            def __init__(self):
+                self.calls = []
+
+            def get_html(self, path, params):
+                key = params["id"]
+                self.calls.append(key)
+                if key not in pages:
+                    raise NotFound(f"нет страницы для {key}")
+                return pages[key]
+
+        client = MultiStub()
         monkeypatch.setattr(server, "_client", client)
         return client
 
@@ -98,6 +120,31 @@ def test_get_tournament_parses(stub, load_fixture):
     result = server.get_tournament("6ad412a")
     assert client.calls == [("GET", "/tournaments/", {"id": "6ad412a"})]
     assert result["participants_count"] == 17
+
+
+def test_ratings_at_event_differ_from_current(stub_multi, load_fixture):
+    # Турнир 2026-09-13. В таблице у этого игрока стоит 84.48 — сегодняшнее
+    # значение. На момент турнира было 90.00. Разница и есть предмет правки.
+    client = stub_multi(
+        {"6ad412a": load_fixture("tournament.html"),
+         "1c18ed8": load_fixture("player_novice.html")}
+    )
+    result = server.get_tournament("6ad412a", ratings_at_event=True)
+    row = next(r for r in result["standings"] if r["player_id"] == "1c18ed8")
+    assert row["rating_current"] == pytest.approx(84.48)
+    assert row["rating_at_event"] == pytest.approx(90.00)
+    assert result["ratings_at_event_resolved"] == 1
+    assert len(result["ratings_at_event_missing"]) == 16
+    assert "1c18ed8" not in result["ratings_at_event_missing"]
+    assert len(client.calls) == 18  # турнир плюс семнадцать профилей
+
+
+def test_ratings_at_event_is_off_by_default(stub, load_fixture):
+    client = stub(load_fixture("tournament.html"))
+    result = server.get_tournament("6ad412a")
+    assert len(client.calls) == 1
+    assert "rating_at_event" not in result["standings"][0]
+    assert result["ratings_at_event_resolved"] is None
 
 
 def test_search_tournaments_uses_ajax(stub, load_fixture):

@@ -27,7 +27,7 @@ def test_player_search_row_fields(load_fixture):
     assert player["games"] == 93
     assert player["wins"] == 81
     assert player["losses"] == 12
-    assert player["rating"] == pytest.approx(865.0)
+    assert player["rating_current"] == pytest.approx(865.0)
     assert player["delta"] == pytest.approx(0.0)
     assert player["date"] == "2026-06-01"
 

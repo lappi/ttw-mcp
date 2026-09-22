@@ -25,7 +25,7 @@ def test_standings_complete(tournament):
     assert len(tournament["standings"]) == 17
     assert tournament["standings"][0]["place"] == 1
     assert tournament["standings"][0]["player_id"] == "7063200"
-    assert tournament["standings"][0]["rating"] == pytest.approx(195.96)
+    assert tournament["standings"][0]["rating_current"] == pytest.approx(195.96)
     assert tournament["standings"][0]["delta"] == pytest.approx(5.03)
 
 
@@ -38,7 +38,7 @@ def test_last_place_row_fields(tournament):
     assert last["games"] == 9
     assert last["wins"] == 0
     assert last["losses"] == 9
-    assert last["rating"] == pytest.approx(84.48)
+    assert last["rating_current"] == pytest.approx(84.48)
     assert last["delta"] == pytest.approx(-5.22)
 
 

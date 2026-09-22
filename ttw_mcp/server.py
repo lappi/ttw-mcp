@@ -11,12 +11,13 @@ from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
 from ttw_mcp.client import TtwClient
+from ttw_mcp.collect import collect_profiles
 from ttw_mcp.errors import InvalidInput, TtwError
 from ttw_mcp.parsers.head_to_head import parse_head_to_head
 from ttw_mcp.parsers.player import parse_player_profile
 from ttw_mcp.parsers.search import parse_player_search, parse_tournament_search
 from ttw_mcp.parsers.tournament import parse_tournament
-from ttw_mcp.rating import annotate_matches
+from ttw_mcp.rating import annotate_matches, rating_at_event
 
 mcp = MCPServer("ttw")
 _client = TtwClient()
@@ -200,17 +201,58 @@ def search_tournaments(name: str = "", date: str = "") -> dict:
 
 @mcp.tool()
 @_reporting
-def get_tournament(tournament_id: str) -> dict:
+def get_tournament(tournament_id: str, ratings_at_event: bool = False) -> dict:
     """Возвращает турнир: метаданные, итоговую таблицу и другие турниры серии.
 
     Страница содержит только итоговую таблицу. Отдельных матчей турнира на
     ней нет — чтобы узнать, кто с кем играл, нужны профили участников
     через get_player.
+
+    У каждой строки standings есть rating_current — это сегодняшний
+    рейтинг игрока, тот, что прямо сейчас показывает сайт, а не тот, с
+    которым он выходил играть этот турнир. Разница доходит до сотен
+    пунктов, и по этому полю нельзя судить о силе поля на дату турнира.
+
+    Флаг ratings_at_event=True восстанавливает исторический рейтинг:
+    добавляет каждой строке standings поле rating_at_event — рейтинг
+    игрока непосредственно перед турниром. Значение может быть null:
+    профиль игрока недоступен, дата вне периодов, покрытых историей
+    рейтинга, либо в этот день у игрока было два турнира и порядок между
+    ними сайт не сообщает. Это честный отказ, а не ошибка разбора.
+
+    Цена флага высокая: восстановление требует отдельного запроса профиля
+    на каждого участника, и запросы идут строго последовательно — сайт
+    закрыт для параллельных обращений и отвечает 4–17 секунд на запрос.
+    На турнире из семнадцати участников это восемнадцать запросов подряд
+    (профили плюс сама страница турнира), то есть от минуты до пяти на
+    крупном турнире. Без необходимости в rating_at_event флаг лучше не
+    включать.
+
+    ratings_at_event_resolved — сколько строк standings получили
+    rating_at_event; null, когда флаг выключен. ratings_at_event_missing —
+    идентификаторы игроков, чьи профили получить не удалось; этого ключа
+    нет в ответе, если флаг выключен.
     """
     html = _client.get_html(
         "/tournaments/", {"id": _valid_id(tournament_id, "tournament_id")}
     )
-    return parse_tournament(html, tournament_id)
+    result = parse_tournament(html, tournament_id)
+
+    if not ratings_at_event:
+        result["ratings_at_event_resolved"] = None
+        return result
+
+    ids = [row["player_id"] for row in result["standings"]]
+    profiles, missing = collect_profiles(_client, ids, include_matches=False)
+    resolved = 0
+    for row in result["standings"]:
+        profile = profiles.get(row["player_id"])
+        value = rating_at_event(profile, result["date"]) if profile else None
+        row["rating_at_event"] = value
+        resolved += value is not None
+    result["ratings_at_event_resolved"] = resolved
+    result["ratings_at_event_missing"] = missing
+    return result
 
 
 def main() -> None:

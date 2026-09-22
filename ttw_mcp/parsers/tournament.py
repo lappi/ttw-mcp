@@ -80,7 +80,7 @@ def parse_tournament(html: str, tournament_id: str) -> dict:
                 "games": parse_int(stat),
                 "wins": wins,
                 "losses": losses,
-                "rating": parse_number(text_of(row.select_one("td.player-rating-cell"))),
+                "rating_current": parse_number(text_of(row.select_one("td.player-rating-cell"))),
                 "delta": parse_number(text_of(row.select_one("td.player-delta-cell"))),
             }
         )

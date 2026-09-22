@@ -60,7 +60,7 @@ def parse_player_search(html: str, limit: int) -> dict:
                 "games": parse_int(text_of(row.select_one("td.player-games-cell"))),
                 "wins": wins,
                 "losses": losses,
-                "rating": parse_number(text_of(row.select_one("td.player-rating-cell"))),
+                "rating_current": parse_number(text_of(row.select_one("td.player-rating-cell"))),
                 "delta": parse_number(text_of(row.select_one("td.player-delta-cell"))),
                 "date": parse_date(text_of(row.select_one("td.player-date-cell"))),
             }
