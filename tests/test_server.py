@@ -1,4 +1,5 @@
 import asyncio
+import re
 
 import pytest
 from mcp.server.mcpserver.exceptions import ToolError, UnexpectedToolError
@@ -145,6 +146,33 @@ def test_ratings_at_event_is_off_by_default(stub, load_fixture):
     assert len(client.calls) == 1
     assert "rating_at_event" not in result["standings"][0]
     assert result["ratings_at_event_resolved"] is None
+
+
+def test_ratings_at_event_all_profiles_unavailable(stub_multi, load_fixture):
+    # Сайт лежит или отдаёт ошибки на все семнадцать профилей. Таблица
+    # обязана вернуться целиком, без падений и без выдуманных значений.
+    client = stub_multi({"6ad412a": load_fixture("tournament.html")})
+    result = server.get_tournament("6ad412a", ratings_at_event=True)
+    assert len(result["standings"]) == 17
+    assert all(row["rating_at_event"] is None for row in result["standings"])
+    assert result["ratings_at_event_resolved"] == 0
+    ids = [row["player_id"] for row in result["standings"]]
+    assert sorted(result["ratings_at_event_missing"]) == sorted(ids)
+    assert len(client.calls) == 18  # турнир плюс семнадцать неудачных попыток
+
+
+def test_ratings_at_event_on_tournament_without_standings(stub_multi, load_fixture):
+    # Турнир до подведения итогов: строк в таблице ещё нет. Разрешать
+    # нечего, поэтому profiles не запрашиваются вовсе, а resolved — 0,
+    # а не null (флаг включён).
+    html = load_fixture("tournament.html")
+    stripped = re.sub(r'<tr><td class="player-place-cell".*?</tr>', "", html, flags=re.S)
+    client = stub_multi({"6ad412a": stripped})
+    result = server.get_tournament("6ad412a", ratings_at_event=True)
+    assert result["standings"] == []
+    assert result["ratings_at_event_resolved"] == 0
+    assert result["ratings_at_event_missing"] == []
+    assert len(client.calls) == 1  # только страница турнира, ни одного профиля
 
 
 def test_search_tournaments_uses_ajax(stub, load_fixture):
