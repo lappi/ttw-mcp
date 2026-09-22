@@ -288,6 +288,7 @@ ttw-mcp/
 | Периоды рейтинга | `.rating-title-cell`, `.rating-rating-cell`, `.rating-delta-cell` |
 | Турнир в списке игрока | `.game-tournament-name-cell`, `.game-tournament-delta-cell` |
 | Таблица турнира | `.player-place-cell`, `.player-name-cell`, `.player-city-cell`, `.player-stat-cell`, `.player-rating-cell`, `.player-delta-cell` |
+| Имя в строке поиска | `.player-name-cell a:not(:has(img))` — в ячейке две ссылки, первая на аватаре |
 | Шапка турнира | `.tournament-date-cell`, `.tournament-address-cell`, `.tournament-organizer-cell`, `.tournament-num-players-cell`, `.tournament-num-games-cell`, `.tournament-info-cell` |
 | Противостояние | `.compare-block-*`, `.compare-rating`, `.compare-position` |
 
