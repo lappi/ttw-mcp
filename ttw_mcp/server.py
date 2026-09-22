@@ -274,8 +274,16 @@ def _is_mirror(left: dict, right: dict) -> bool:
     )
 
 
-def _reconcile_matches(profiles: dict[str, dict], date: str) -> list[dict]:
-    """Сводит матчи одного дня из профилей участников.
+def _reconcile_matches(profiles: dict[str, dict], tournament_id: str) -> list[dict]:
+    """Сводит матчи одного турнира из профилей участников.
+
+    Отбор идёт по tournament_id, а не по дате: участник мог в тот же день
+    сыграть ещё один турнир (get_tournament это отдельно оговаривает), и
+    фильтр по дате затянул бы в выдачу матчи чужого турнира того же дня —
+    в лучшем случае лишние строки, в худшем ParseError на исправных
+    данных, если у такой строки случайно не нашлось бы зеркала. Замерено,
+    что поле tournament_id заполнено у всех проверенных матчей и в дни с
+    двумя турнирами делит их начисто.
 
     Матч виден с двух сторон, если собраны оба профиля, и с одной, если
     собран только один. Строки группируются по паре игроков, и каждой
@@ -290,7 +298,7 @@ def _reconcile_matches(profiles: dict[str, dict], date: str) -> list[dict]:
     rows: dict[tuple[str, str], list[dict]] = {}
     for player_id, profile in profiles.items():
         for match in profile.get("matches", []):
-            if match["date"] != date:
+            if match["tournament_id"] != tournament_id:
                 continue
             key = tuple(sorted((player_id, match["opponent_id"])))
             rows.setdefault(key, []).append(
@@ -363,7 +371,7 @@ def get_tournament_matches(tournament_id: str) -> dict:
     date = tournament["date"]
     ids = [row["player_id"] for row in tournament["standings"]]
     profiles, missing = collect_profiles(_client, ids)
-    matches = _reconcile_matches(profiles, date)
+    matches = _reconcile_matches(profiles, tournament_id)
 
     return {
         "tournament_id": tournament_id,
