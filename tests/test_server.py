@@ -102,7 +102,8 @@ def test_get_player_docstring_warns_about_window_and_lag():
     # утверждающем обратное, поэтому сверяемся с формулировками, которые
     # нельзя удовлетворить противоположным по смыслу текстом.
     doc = server.get_player.__doc__
-    assert "12 месяцев" in doc
+    assert "не ограничена фиксированным окном" in doc
+    assert "rated_periods" in doc
     assert "summary" in doc and "отстаёт" in doc
     assert "используйте matches" in doc
     assert "walkover" in doc
