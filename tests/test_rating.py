@@ -80,11 +80,23 @@ def test_annotate_matches_covers_best_wins_too(load_fixture):
     # стороны можно только по восстановленному значению.
     profile = parse_player_profile(load_fixture("player_veteran.html"), "66f1645")
     annotate_matches(profile)
-    by_date = {w["date"]: w["player_rating_at_match"] for w in profile["best_wins"]}
-    assert by_date["2026-06-13"] == pytest.approx(175.17)
-    assert by_date["2026-06-28"] == pytest.approx(181.66)
-    assert by_date["2026-08-16"] == pytest.approx(194.18)
-    assert by_date["2026-08-23"] == pytest.approx(200.60)
+    expected = {
+        "2026-06-13": 175.17,
+        "2026-06-28": 181.66,
+        "2026-08-16": 194.18,
+        "2026-08-23": 200.60,
+    }
+    # Без схлопывания в словарь по дате: 2026-06-28 в списке встречается
+    # дважды (две лучшие победы в один день), и проверка каждой записи
+    # по отдельности доказывает, что обе получили одно и то же значение,
+    # а не что в словаре просто осталась последняя из двух.
+    for win in profile["best_wins"]:
+        assert win["player_rating_at_match"] == pytest.approx(
+            expected[win["date"]]
+        ), win["date"]
+    same_day = [w for w in profile["best_wins"] if w["date"] == "2026-06-28"]
+    assert len(same_day) == 2
+    assert all(w["player_rating_at_match"] == pytest.approx(181.66) for w in same_day)
 
 
 def test_best_wins_keep_the_site_value_under_an_honest_name(load_fixture):
@@ -96,10 +108,9 @@ def test_best_wins_keep_the_site_value_under_an_honest_name(load_fixture):
     assert profile["current_rating"] == pytest.approx(208.39)
 
 
-def test_unresolved_ratings_are_only_the_ambiguous_days(load_fixture):
+def test_unresolved_ratings_are_only_the_ambiguous_days(deep):
     # 207 матчей из 1127 остаются без рейтинга, и все до единого — в даты,
     # когда игрок сыграл два турнира. Ни один не выпал из-за дыры в истории.
-    deep = parse_player_profile(load_fixture("player_walkover_loss.html"), "44d227e")
     annotate_matches(deep)
     unresolved = [m for m in deep["matches"] if m["player_rating_at_match"] is None]
     assert len(unresolved) == 207
