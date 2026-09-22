@@ -16,6 +16,7 @@ from ttw_mcp.parsers.head_to_head import parse_head_to_head
 from ttw_mcp.parsers.player import parse_player_profile
 from ttw_mcp.parsers.search import parse_player_search, parse_tournament_search
 from ttw_mcp.parsers.tournament import parse_tournament
+from ttw_mcp.rating import annotate_matches
 
 mcp = MCPServer("ttw")
 _client = TtwClient()
@@ -103,6 +104,17 @@ def get_player(
 
     Пустой best_wins означает отсутствие заметных побед, а не сбой.
 
+    Каждая запись matches и best_wins несёт player_rating_at_match —
+    восстановленный рейтинг самого игрока непосредственно перед этим
+    событием. Сайт даёт рейтинг соперника, но не собственный, и без этого
+    поля матч нельзя сопоставить по силе сторон. Значение может быть null:
+    это честный отказ на датах, где у игрока в один день два турнира и
+    сайт не сообщает их порядок, — не подставляйте вместо null
+    приближение. В best_wins отдельно есть player_rating_current —
+    сегодняшний рейтинг игрока (не на момент победы!), который показывает
+    сайт; для сопоставления по силе сторон нужен именно
+    player_rating_at_match.
+
     Технический результат приходит с result "walkover_win" или "walkover_loss",
     score_for и score_against равны null, а исходная запись сайта лежит в
     score_raw. Такой матч сыгран и учитывается наравне с остальными.
@@ -128,9 +140,12 @@ def get_player(
             f"matches_since должен быть в формате YYYY-MM-DD, получено {matches_since!r}"
         )
     html = _client.get_html("/players/", {"id": _valid_id(player_id, "player_id")})
-    return parse_player_profile(
+    profile = parse_player_profile(
         html, player_id, include_matches=include_matches, matches_since=since
     )
+    if include_matches:
+        annotate_matches(profile)
+    return profile
 
 
 @mcp.tool()

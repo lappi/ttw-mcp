@@ -67,6 +67,17 @@ def test_get_player_requests_right_url_and_parses(stub, load_fixture):
     assert len(result["matches"]) == 16
 
 
+def test_matches_carry_the_players_own_rating(stub, load_fixture):
+    # Рейтинг соперника сайт даёт, свой — нет. Без него матч нельзя
+    # сопоставить по силе сторон, и в полевом отчёте датасет на 169 матчей
+    # собирался вручную именно из-за этого.
+    stub(load_fixture("player_novice.html"))
+    result = server.get_player("1c18ed8")
+    assert all("player_rating_at_match" in m for m in result["matches"])
+    assert all(m["player_rating_at_match"] is not None for m in result["matches"])
+    assert {m["player_rating_at_match"] for m in result["matches"]} == {84.78, 90.00}
+
+
 def test_search_players_passes_limit(stub, load_fixture):
     stub(load_fixture("search_players_many.html"))
     result = server.search_players("фомин", limit=1)

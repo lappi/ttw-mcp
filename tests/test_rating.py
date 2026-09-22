@@ -72,3 +72,40 @@ def test_annotate_matches_leaves_none_on_ambiguous_days(deep):
     ambiguous = [m for m in deep["matches"] if m["date"] == "2023-12-30"]
     assert len(ambiguous) == 12
     assert all(m["player_rating_at_match"] is None for m in ambiguous)
+
+
+def test_annotate_matches_covers_best_wins_too(load_fixture):
+    # У лучших побед сайт показывает собственный рейтинг игрока
+    # сегодняшний, а рейтинг соперника — на момент встречи. Сопоставить
+    # стороны можно только по восстановленному значению.
+    profile = parse_player_profile(load_fixture("player_veteran.html"), "66f1645")
+    annotate_matches(profile)
+    by_date = {w["date"]: w["player_rating_at_match"] for w in profile["best_wins"]}
+    assert by_date["2026-06-13"] == pytest.approx(175.17)
+    assert by_date["2026-06-28"] == pytest.approx(181.66)
+    assert by_date["2026-08-16"] == pytest.approx(194.18)
+    assert by_date["2026-08-23"] == pytest.approx(200.60)
+
+
+def test_best_wins_keep_the_site_value_under_an_honest_name(load_fixture):
+    # 208.0 — это сегодняшний рейтинг игрока (208.39), а не рейтинг на
+    # момент победы. Имя обязано это говорить.
+    profile = parse_player_profile(load_fixture("player_veteran.html"), "66f1645")
+    assert all("player_rating" not in w for w in profile["best_wins"])
+    assert {w["player_rating_current"] for w in profile["best_wins"]} == {208.0}
+    assert profile["current_rating"] == pytest.approx(208.39)
+
+
+def test_unresolved_ratings_are_only_the_ambiguous_days(load_fixture):
+    # 207 матчей из 1127 остаются без рейтинга, и все до единого — в даты,
+    # когда игрок сыграл два турнира. Ни один не выпал из-за дыры в истории.
+    deep = parse_player_profile(load_fixture("player_walkover_loss.html"), "44d227e")
+    annotate_matches(deep)
+    unresolved = [m for m in deep["matches"] if m["player_rating_at_match"] is None]
+    assert len(unresolved) == 207
+    crowded = {
+        t["date"]
+        for t in deep["tournaments"]
+        if sum(1 for x in deep["tournaments"] if x["date"] == t["date"]) > 1
+    }
+    assert all(m["date"] in crowded for m in unresolved)

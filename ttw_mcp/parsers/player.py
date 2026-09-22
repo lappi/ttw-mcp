@@ -162,7 +162,16 @@ def _seed(periods: list[dict], matches: list[dict]) -> tuple[float | None, str |
 
 
 def _parse_best_wins(page) -> list[dict]:
-    """Блок «Лучшие победы» использует другие классы и не даёт id соперника."""
+    """Блок «Лучшие победы» использует другие классы и не даёт id соперника.
+
+    Рейтинг соперника в строке сайт пишет на момент той встречи, а
+    собственный рейтинг игрока — сегодняшний, усечённый до целого (и
+    постоянный для всех записей блока). Это разные временные основания,
+    поэтому поле называется player_rating_current, а не player_rating:
+    имя обязано честно говорить, что оно не совпадает по смыслу с
+    player_rating_at_match, которым annotate_matches дополнит эти же
+    записи.
+    """
     block = page.select_one("div.player-best-games")
     if block is None:
         return []
@@ -191,7 +200,7 @@ def _parse_best_wins(page) -> list[dict]:
             best.append(
                 {
                     **current,
-                    "player_rating": own_rating,
+                    "player_rating_current": own_rating,
                     "score_raw": raw_score,
                     "score_for": score_for,
                     "score_against": score_against,

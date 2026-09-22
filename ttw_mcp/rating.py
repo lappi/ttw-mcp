@@ -43,10 +43,22 @@ def annotate_matches(profile: dict) -> None:
     Рейтинг соперника сайт отдаёт с двумя знаками, а собственный — нет; без
     этого поля матч нельзя сопоставить по силе сторон, и в полевом отчёте
     датасет на 169 матчей собирался вручную именно из-за его отсутствия.
+
+    Проходит и по matches, и по best_wins — лучшие победы это тоже матчи,
+    из того же блока страницы, и у них та же беда: сайт пишет в строке
+    player_rating_current (сегодняшний рейтинг игрока), а не значение на
+    момент той победы. Кэш по дате общий для обоих списков. Любого списка
+    может не быть вовсе при include_matches=False, поэтому оба читаются
+    через profile.get(...).
     """
     cache: dict[str, float | None] = {}
-    for match in profile.get("matches", []):
-        date = match["date"]
+
+    def _rating_on(date: str) -> float | None:
         if date not in cache:
             cache[date] = rating_at_event(profile, date)
-        match["player_rating_at_match"] = cache[date]
+        return cache[date]
+
+    for match in profile.get("matches", []):
+        match["player_rating_at_match"] = _rating_on(match["date"])
+    for win in profile.get("best_wins", []):
+        win["player_rating_at_match"] = _rating_on(win["date"])
