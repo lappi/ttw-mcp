@@ -18,9 +18,9 @@ def test_both_sides_identified(h2h):
 
 def test_ratings_and_ranks(h2h):
     # На этой странице рейтинг округлён до целого — два знака она не даёт.
-    assert h2h["player"]["current_rating"] == pytest.approx(84.0)
+    assert h2h["player"]["rating_current"] == pytest.approx(84.0)
     assert h2h["player"]["rank"] == 91485
-    assert h2h["opponent"]["current_rating"] == pytest.approx(70.0)
+    assert h2h["opponent"]["rating_current"] == pytest.approx(70.0)
     assert h2h["opponent"]["rank"] == 96020
 
 
@@ -57,6 +57,25 @@ def test_walkover_in_head_to_head_is_kept(load_fixture):
     assert len(walkovers) == 1
     assert walkovers[0]["player_score"] is None
     assert walkovers[0]["opponent_score"] is None
+
+
+@pytest.mark.parametrize(
+    "fixture_name,player_id,opponent_id",
+    [
+        ("head_to_head.html", "1c18ed8", "17828c3"),
+        ("head_to_head_walkover.html", "66f1645", "730eb6d"),
+        ("head_to_head_never_met.html", "1c18ed8", "7063200"),
+    ],
+)
+def test_hand_field_present_and_unmarked_on_these_fixtures(
+    load_fixture, fixture_name, player_id, opponent_id
+):
+    # На всех трёх фикстурах очных встреч пометки руки нет ни с одной
+    # стороны; поле всё равно присутствует и равно None, а не отсутствует
+    # в словаре.
+    h2h = parse_head_to_head(load_fixture(fixture_name), player_id, opponent_id)
+    assert h2h["player"]["hand"] is None
+    assert h2h["opponent"]["hand"] is None
 
 
 def test_broken_markup_raises_parse_error():

@@ -38,3 +38,17 @@ def test_live_tournament_still_parses(client):
     tournament = parse_tournament(html, "6ad412a")
     assert tournament["participants_count"] == 17
     assert len(tournament["standings"]) == 17
+
+
+def test_live_tournament_matches_still_reconstruct(client):
+    # Единственное место, где видно, что состав и матчи разошлись:
+    # остальные тесты работают на снимках и останутся зелёными после
+    # любого изменения сайта. Турнир взят маленький намеренно: сигнал тот
+    # же, а запросов к сайту вдвое меньше.
+    from ttw_mcp import server
+
+    server._client = client
+    result = server.get_tournament_matches("79a8c89")
+    assert result["participants_count"] == 9
+    assert result["matches"], "матчи собрались хотя бы у части участников"
+    assert all(m["date"] == result["date"] for m in result["matches"])

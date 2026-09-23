@@ -27,7 +27,7 @@ def test_player_search_row_fields(load_fixture):
     assert player["games"] == 93
     assert player["wins"] == 81
     assert player["losses"] == 12
-    assert player["rating"] == pytest.approx(865.0)
+    assert player["rating_current"] == pytest.approx(865.0)
     assert player["delta"] == pytest.approx(0.0)
     assert player["date"] == "2026-06-01"
 
@@ -66,6 +66,15 @@ def test_renamed_class_raises_instead_of_reporting_zero(load_fixture):
 def test_non_positive_limit_is_rejected(load_fixture, bad):
     with pytest.raises(InvalidInput):
         parse_player_search(load_fixture("search_players_many.html"), limit=bad)
+
+
+def test_hand_marker_is_split_out_of_the_name(load_fixture):
+    # Поправка 5: в этой выдаче ровно один игрок с пометкой руки, «левая».
+    result = parse_player_search(load_fixture("search_players_many.html"), limit=200)
+    with_hand = [p for p in result["players"] if p["hand"]]
+    assert len(with_hand) == 1
+    assert with_hand[0]["hand"] == "левая"
+    assert "(" not in with_hand[0]["name"]
 
 
 def test_tournament_search_parses_ajax_divs(load_fixture):

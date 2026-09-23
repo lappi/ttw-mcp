@@ -15,6 +15,7 @@ from ttw_mcp.parsers.common import (
     parse_number,
     parse_win_loss,
     require,
+    split_hand,
     text_of,
 )
 
@@ -48,16 +49,18 @@ def parse_player_search(html: str, limit: int) -> dict:
         )
         stat = text_of(row.select_one("td.player-stat-cell"))
         wins, losses = parse_win_loss(stat)
+        player_name, hand = split_hand(text_of(link))
         players.append(
             {
                 "id": extract_id(link["href"]),
-                "name": text_of(link),
+                "name": player_name,
+                "hand": hand,
                 "city": text_of(row.select_one("td.player-city-cell")),
                 "tournaments": parse_int(text_of(row.select_one("td.player-tournament-cell"))),
                 "games": parse_int(text_of(row.select_one("td.player-games-cell"))),
                 "wins": wins,
                 "losses": losses,
-                "rating": parse_number(text_of(row.select_one("td.player-rating-cell"))),
+                "rating_current": parse_number(text_of(row.select_one("td.player-rating-cell"))),
                 "delta": parse_number(text_of(row.select_one("td.player-delta-cell"))),
                 "date": parse_date(text_of(row.select_one("td.player-date-cell"))),
             }
