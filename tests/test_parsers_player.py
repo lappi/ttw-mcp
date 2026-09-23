@@ -207,7 +207,7 @@ def test_not_played_is_separated_from_losses(load_fixture):
 
 
 def test_hand_marker_is_split_out_of_opponent_names(load_fixture):
-    # Двадцать одно вхождение из двадцати трёх живёт именно здесь, а не в поиске.
+    # Двадцать два вхождения из двадцати пяти живут именно здесь, а не в поиске.
     profile = parse_player_profile(load_fixture("player_walkover_loss.html"), "44d227e")
     marked = [m for m in profile["matches"] if m["opponent_hand"]]
     assert len(marked) == 16
