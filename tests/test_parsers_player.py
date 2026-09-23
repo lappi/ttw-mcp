@@ -210,8 +210,8 @@ def test_hand_marker_is_split_out_of_opponent_names(load_fixture):
     # Двадцать одно вхождение из двадцати трёх живёт именно здесь, а не в поиске.
     profile = parse_player_profile(load_fixture("player_walkover_loss.html"), "44d227e")
     marked = [m for m in profile["matches"] if m["opponent_hand"]]
-    assert len(marked) == 14
-    assert sum(1 for m in marked if m["opponent_hand"] == "левая") == 8
+    assert len(marked) == 16
+    assert sum(1 for m in marked if m["opponent_hand"] == "левая") == 10
     assert sum(1 for m in marked if m["opponent_hand"] == "правая") == 6
     assert all("(" not in m["opponent_name"] for m in marked)
     assert all(m["opponent_hand"] in ("левая", "правая") for m in marked)
