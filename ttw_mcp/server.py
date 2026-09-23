@@ -233,10 +233,21 @@ def get_player(
     фильтровать нечего, ошибки это не вызывает.
     """
     since = matches_since.strip() or None
-    if since is not None and not _ISO_DATE.fullmatch(since):
-        raise InvalidInput(
-            f"matches_since должен быть в формате YYYY-MM-DD, получено {matches_since!r}"
-        )
+    if since is not None:
+        if not _ISO_DATE.fullmatch(since):
+            raise InvalidInput(
+                f"matches_since должен быть в формате YYYY-MM-DD, получено {matches_since!r}"
+            )
+        # Регулярка выше проверяет только форму ГГГГ-ММ-ДД; 2026-13-01 её
+        # проходит. Дальше фильтрация идёт строковым сравнением, и на такое
+        # значение инструмент молча отдал бы matches: [] — неотличимо от
+        # «матчей после этой даты нет». Разбираем дату по-настоящему.
+        try:
+            datetime.strptime(since, "%Y-%m-%d")
+        except ValueError as exc:
+            raise InvalidInput(
+                f"matches_since: {matches_since!r} не является датой"
+            ) from exc
     html = _client.get_html("/players/", {"id": _valid_id(player_id, "player_id")})
     profile = parse_player_profile(
         html, player_id, include_matches=include_matches, matches_since=since
@@ -363,6 +374,13 @@ def search_tournaments(
             raise InvalidInput(
                 f"{field} должен быть в формате DD.MM.YYYY, получено {value!r}"
             )
+    if date.strip():
+        # Регулярка выше проверяет только форму DD.MM.YYYY; 99.99.2026 и
+        # 31.02.2026 её проходят. Без этой проверки такая дата ушла бы в
+        # запрос, а сайт на неё ответит пустым списком — неотличимо от
+        # «турниров в этот день не было». Результат не нужен, нужна сама
+        # проверка, поэтому она стоит здесь же, а не только у date_from/date_to.
+        _day(date.strip(), "date")
 
     dates = (
         _dates_in_range(date_from.strip(), date_to.strip()) if has_range else [date]

@@ -288,6 +288,17 @@ def test_get_player_rejects_non_iso_since(stub):
     assert client.calls == []
 
 
+def test_impossible_matches_since_is_refused(stub, load_fixture):
+    # _ISO_DATE.fullmatch проверяет только форму ГГГГ-ММ-ДД; 2026-13-01 её
+    # проходит. Без разбора по-настоящему фильтрация пошла бы строковым
+    # сравнением и молча вернула бы matches: [] — неотличимо от «матчей
+    # после этой даты нет».
+    client = stub(load_fixture("player_veteran.html"))
+    with pytest.raises(ToolError, match="не является датой"):
+        server.get_player("66f1645", matches_since="2026-13-01")
+    assert client.calls == []
+
+
 def test_tournament_matches_are_collected_from_participants(stub_multi, load_fixture):
     # Страница турнира матчей не содержит — они лежат в профилях участников.
     stub_multi(
@@ -529,6 +540,16 @@ def test_impossible_date_is_named_not_erased(stub):
     client = stub()
     with pytest.raises(ToolError, match="не является датой"):
         server.search_tournaments(date_from="99.99.2026", date_to="99.99.2026")
+    assert client.calls == []
+
+
+def test_impossible_single_date_is_refused_before_the_network(stub):
+    # Одиночный date раньше проверялся только регуляркой формата: 31.02.2026
+    # проходил её и уходил в запрос, а живой сайт на такую дату отвечает
+    # пустым списком — неотличимо от «турниров в этот день не было».
+    client = stub()
+    with pytest.raises(ToolError, match="не является датой"):
+        server.search_tournaments(date="31.02.2026")
     assert client.calls == []
 
 
