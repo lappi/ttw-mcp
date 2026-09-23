@@ -89,7 +89,10 @@ def test_reconcile_mirrors_not_played_by_result():
 def test_reconcile_mirrors_unparsed_by_result():
     # unparsed — признак изменившейся вёрстки, но раз уж обе стороны дали
     # такую запись с совпадающим (пустым) счётом, зеркало для неё в
-    # таблице _MIRROR тоже обязано находиться, а не падать с KeyError.
+    # таблице _MIRROR тоже обязано находиться. _MIRROR.get(...) не бросает
+    # KeyError сам по себе — при отсутствии записи это было бы просто
+    # несовпадением, которое ниже по стеку корректно превращается в
+    # ParseError, а не падение с KeyError.
     left = _row("bbb2222", None, None, "unparsed")
     left["score_raw"] = "?"
     right = _row("aaa1111", None, None, "unparsed")

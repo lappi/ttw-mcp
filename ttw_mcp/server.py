@@ -469,7 +469,10 @@ def get_tournament(tournament_id: str, ratings_at_event: bool = False) -> dict:
     ratings_at_event_resolved — сколько строк standings получили
     rating_at_event; null, когда флаг выключен. ratings_at_event_missing —
     идентификаторы игроков, чьи профили получить не удалось; этого ключа
-    нет в ответе, если флаг выключен.
+    нет в ответе, если флаг выключен. Имя отличается от missing_profiles
+    в get_tournament_matches и get_series нарочно: здесь поле стоит рядом
+    с ratings_at_event_resolved и привязано именно к флагу
+    ratings_at_event, а не к сбору профилей вообще.
     """
     html = _client.get_html(
         "/tournaments/", {"id": _valid_id(tournament_id, "tournament_id")}
