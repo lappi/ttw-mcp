@@ -87,7 +87,7 @@ MCP-сервер для доступа к рейтингу настольног�
 
 ```bash
 uv run python scripts/fetch_fixtures.py   # получить/обновить фикстуры
-uv run pytest                             # 213 тестов, без сети
+uv run pytest                             # 219 тестов, без сети
 uv run pytest -m smoke                    # 4 теста против живого сайта
 ```
 
