@@ -98,6 +98,13 @@ def test_reconcile_mirrors_unparsed_by_result():
     assert len(matches) == 1
 
 
+def test_reconcile_rejects_profiles_collected_without_matches():
+    # Профиль без ключа matches — это не «матчей не было», а «их не
+    # запрашивали». Молча вернуть пустой список значило бы соврать.
+    with pytest.raises(ParseError):
+        reconcile_matches({"aaa1111": {"matches_total": 12}}, "ttt9999")
+
+
 def test_reconcile_ignores_another_tournament_on_the_same_day():
     # Участник сыграл в тот же день второй турнир. Его матчи оттуда не
     # должны попасть в выдачу: при отборе по дате они выглядели бы

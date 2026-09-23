@@ -48,10 +48,24 @@ def reconcile_matches(profiles: dict[str, dict], tournament_id: str) -> list[dic
     Если у строки нет зеркала, а профиль соперника собран, поднимается
     ParseError: выбрать одну из двух версий счёта молча значило бы отдать
     модели выдуманный результат.
+
+    Вызывающая сторона обязана собирать профили с матчами (include_matches
+    по умолчанию и есть True): профиль без ключа matches — это не «у
+    игрока не было матчей», а «их не запрашивали», и это не одно и то же.
+    Такой профиль в сведение попасть не может по смыслу: молча вернуть по
+    нему пустой список значило бы выдать «их не запрашивали» за «их не
+    было», поэтому при отсутствии ключа поднимается ParseError.
     """
     rows: dict[tuple[str, str], list[dict]] = {}
     for player_id, profile in profiles.items():
-        for match in profile.get("matches", []):
+        if "matches" not in profile:
+            raise ParseError(
+                "get_tournament_matches",
+                "matches",
+                f"профиль {player_id} собран без матчей (include_matches=False); "
+                "reconcile_matches требует профили с матчами",
+            )
+        for match in profile["matches"]:
             if match["tournament_id"] != tournament_id:
                 continue
             key = tuple(sorted((player_id, match["opponent_id"])))
