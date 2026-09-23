@@ -31,21 +31,217 @@ MCP-сервер для доступа к рейтингу настольног�
 или диапазон `date_from`/`date_to` (порознь с `date`); для `search_players`
 обязателен `name`. Дата — в формате DD.MM.YYYY.
 
-## Установка
+## Подключение
+
+### Что понадобится
+
+[uv](https://docs.astral.sh/uv/) и Python 3.11 или новее. Клонировать
+репозиторий не нужно: `uvx` соберёт сервер прямо из git при первом запуске
+и закэширует сборку.
+
+Ключей, токенов и переменных окружения не требуется — источник публичный.
+
+### Команда запуска
+
+Она одна и та же во всех клиентах:
+
+```bash
+uvx --from git+https://github.com/lappi/ttw-mcp ttw-mcp
+```
+
+В конфигурационных файлах она распадается на `command` и `args`:
+
+```json
+"command": "uvx",
+"args": ["--from", "git+https://github.com/lappi/ttw-mcp", "ttw-mcp"]
+```
+
+Если клиент сообщает, что команда не найдена, подставьте полный путь —
+его покажет `which uvx` (обычно `~/.local/bin/uvx`). Клиенты запускают
+процесс не из вашей оболочки и переменную `PATH` из `.zshrc` или
+`.bashrc` не видят.
+
+### Claude Code
+
+```bash
+claude mcp add ttw -- uvx --from git+https://github.com/lappi/ttw-mcp ttw-mcp
+```
+
+Двойное тире отделяет опции `claude` от команды сервера: всё, что после
+него, передаётся серверу как есть.
+
+Где сохранится настройка, задаёт `--scope`:
+
+| Область | Файл | Видна команде |
+| --- | --- | --- |
+| `local` (по умолчанию) | `~/.claude.json` | нет |
+| `project` | `.mcp.json` в корне проекта | да, через систему контроля версий |
+| `user` | `~/.claude.json` | нет |
+
+Проверка: `claude mcp list` в оболочке или `/mcp` внутри сессии.
+
+### Claude Desktop
+
+Настройки → вкладка «Developer» → «Edit Config». Кнопка откроет файл:
+
+- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
 
 ```json
 {
   "mcpServers": {
     "ttw": {
-      "type": "stdio",
-      "command": "uv",
-      "args": ["--directory", "/Users/lappi/Work/ai/ttw-mcp", "run", "ttw-mcp"]
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/lappi/ttw-mcp", "ttw-mcp"]
     }
   }
 }
 ```
 
-Конфигурации и секретов не требуется: источник публичный.
+После сохранения приложение нужно полностью завершить и запустить заново.
+Сервер появится в списке коннекторов рядом с полем ввода.
+
+Если не появился — смотрите журнал: `~/Library/Logs/Claude/mcp*.log` на
+macOS, `%APPDATA%\Claude\logs` на Windows. Файл `mcp-server-ttw.log`
+содержит всё, что сервер написал в stderr.
+
+### ChatGPT (десктоп), Codex CLI и расширение для IDE
+
+У них общий конфигурационный файл: настроив один раз, вы получаете сервер
+во всех трёх.
+
+```bash
+codex mcp add ttw -- uvx --from git+https://github.com/lappi/ttw-mcp ttw-mcp
+```
+
+Либо вручную, в `~/.codex/config.toml` (или `.codex/config.toml` в
+доверенном проекте) — формат здесь TOML, а не JSON:
+
+```toml
+[mcp_servers.ttw]
+command = "uvx"
+args = ["--from", "git+https://github.com/lappi/ttw-mcp", "ttw-mcp"]
+```
+
+Проверка: `/mcp` в Codex.
+
+### ChatGPT в браузере — не подключится, и вот почему
+
+Веб-версия не читает локальные конфигурационные файлы: она работает
+только с удалёнными MCP-серверами по HTTP, подключаемыми через плагины.
+Этот сервер — локальный, он общается по stdio и никуда не выставлен.
+
+Варианта два: пользоваться десктопным приложением (см. раздел выше) либо
+поднять HTTP-обёртку над stdio на своём хосте. Второе выходит за рамки
+этого репозитория: сервер ходит на сайт, который просит не обходить себя
+автоматически, и выставлять его в сеть — отдельное решение с отдельной
+ответственностью.
+
+### Gemini CLI
+
+Файл `~/.gemini/settings.json` (глобально) или `.gemini/settings.json`
+(в проекте):
+
+```json
+{
+  "mcpServers": {
+    "ttw": {
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/lappi/ttw-mcp", "ttw-mcp"]
+    }
+  }
+}
+```
+
+Проверка: `gemini mcp list` в оболочке или `/mcp` внутри сессии. Добавить
+сервер можно и командой `gemini mcp add`.
+
+### Cursor
+
+Файл `~/.cursor/mcp.json` (глобально) или `.cursor/mcp.json` (в проекте),
+формат тот же:
+
+```json
+{
+  "mcpServers": {
+    "ttw": {
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/lappi/ttw-mcp", "ttw-mcp"]
+    }
+  }
+}
+```
+
+### VS Code
+
+Здесь формат свой: ключ верхнего уровня называется `servers`, а у сервера
+появляется `type`.
+
+Файл `.vscode/mcp.json` в проекте:
+
+```json
+{
+  "servers": {
+    "ttw": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/lappi/ttw-mcp", "ttw-mcp"]
+    }
+  }
+}
+```
+
+Через палитру команд: **MCP: Add Server** — мастер с выбором области,
+**MCP: Open User Configuration** — тот же файл на уровне профиля, для всех
+рабочих областей сразу.
+
+### Остальные клиенты
+
+Большинство используют тот же объект `mcpServers`, что Claude Desktop,
+Cursor и Gemini CLI, — меняется только путь к файлу:
+
+| Клиент | Как добраться до конфигурации |
+| --- | --- |
+| Windsurf / Cascade | Меню `...` в панели Cascade → «Open MCP config file». Путь к файлу за последнее время менялся вместе с переездом продукта, поэтому надёжнее открывать его из интерфейса, а не искать вручную |
+| Zed | Настройки, блок `context_servers` |
+| LM Studio | Настройки → MCP Servers → Add Server: имя, команда, аргументы |
+| Cline, Continue, JetBrains и прочие | Ищите в настройках «MCP» и вставляйте тот же объект `mcpServers` |
+
+Клиентов много и конфигурации у них меняются, поэтому если путь из этой
+таблицы не совпал — источник истины всегда документация самого клиента, а
+не эта. Команда запуска при этом остаётся прежней.
+
+### Проверка без клиента
+
+Если клиент молчит и непонятно, на чьей стороне проблема, сервер можно
+опросить напрямую — он ответит на приветствие протокола:
+
+```bash
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"probe","version":"0"}}}' \
+  | uvx --from git+https://github.com/lappi/ttw-mcp ttw-mcp
+```
+
+В ответ придёт одна строка JSON с `serverInfo`, именем `ttw` и версией.
+Пришла — сервер исправен, и разбираться надо с настройками клиента. Не
+пришла — читайте, что команда написала в stderr.
+
+### Из клона — для разработки
+
+Если вы правите код, запускать надо не из git, а из рабочей копии:
+
+```json
+{
+  "mcpServers": {
+    "ttw": {
+      "command": "uv",
+      "args": ["--directory", "/путь/к/ttw-mcp", "run", "ttw-mcp"]
+    }
+  }
+}
+```
+
+Путь должен быть абсолютным: клиент запускает процесс из своего рабочего
+каталога, а не из вашего.
 
 ## Ограничения источника
 
@@ -86,8 +282,9 @@ MCP-сервер для доступа к рейтингу настольног�
 четырнадцать запросов с паузами, около полутора минут:
 
 ```bash
+git clone https://github.com/lappi/ttw-mcp && cd ttw-mcp
 uv run python scripts/fetch_fixtures.py   # получить/обновить фикстуры
-uv run pytest                             # 219 тестов, без сети
+uv run pytest                             # 220 тестов, без сети
 uv run pytest -m smoke                    # 4 теста против живого сайта
 ```
 
