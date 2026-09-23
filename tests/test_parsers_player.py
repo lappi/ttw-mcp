@@ -23,9 +23,9 @@ def test_header_fields(novice):
     assert novice["rank"] == 91485
 
 
-def test_current_rating_comes_from_newest_period_not_rounded_header(novice):
+def test_rating_current_comes_from_newest_period_not_rounded_header(novice):
     # Шапка страницы показывает 84, ячейка последнего периода — 84.49.
-    assert novice["current_rating"] == pytest.approx(84.49)
+    assert novice["rating_current"] == pytest.approx(84.49)
 
 
 def test_summary_block(novice):
@@ -111,7 +111,7 @@ def test_walkover_match_is_kept_not_dropped(veteran):
 def test_veteran_has_full_twelve_month_window(veteran):
     assert veteran["name"]
     assert veteran["rank"] == 43767
-    assert veteran["current_rating"] == pytest.approx(208.39)
+    assert veteran["rating_current"] == pytest.approx(208.39)
     assert len(veteran["periods"]) == 13
     assert len(veteran["matches"]) == 106
     assert veteran["summary"]["wins"] == 76
@@ -135,7 +135,7 @@ def test_best_wins_player_rating_is_rounded_not_truncated(load_fixture):
     # и усечение. Различает только этот: 70.94 на странице против 71 в
     # блоке лучших побед.
     profile = parse_player_profile(load_fixture("player_participant.html"), "17828c3")
-    assert profile["current_rating"] == pytest.approx(70.94)
+    assert profile["rating_current"] == pytest.approx(70.94)
     assert {w["player_rating_current"] for w in profile["best_wins"]} == {71.0}
 
 

@@ -18,9 +18,9 @@ def test_both_sides_identified(h2h):
 
 def test_ratings_and_ranks(h2h):
     # На этой странице рейтинг округлён до целого — два знака она не даёт.
-    assert h2h["player"]["current_rating"] == pytest.approx(84.0)
+    assert h2h["player"]["rating_current"] == pytest.approx(84.0)
     assert h2h["player"]["rank"] == 91485
-    assert h2h["opponent"]["current_rating"] == pytest.approx(70.0)
+    assert h2h["opponent"]["rating_current"] == pytest.approx(70.0)
     assert h2h["opponent"]["rank"] == 96020
 
 

@@ -24,7 +24,7 @@ def test_rating_at_event_differs_from_the_current_one(novice):
     # игрока его СЕГОДНЯШНИЙ рейтинг, а на момент турнира было 90.00.
     # Ради этой разницы инструмент и существует.
     assert rating_at_event(novice, "2026-09-13") == pytest.approx(90.00)
-    assert novice["current_rating"] == pytest.approx(84.49)
+    assert novice["rating_current"] == pytest.approx(84.49)
 
 
 def test_rating_at_event_is_none_outside_known_history(novice):
@@ -105,7 +105,7 @@ def test_best_wins_keep_the_site_value_under_an_honest_name(load_fixture):
     profile = parse_player_profile(load_fixture("player_veteran.html"), "66f1645")
     assert all("player_rating" not in w for w in profile["best_wins"])
     assert {w["player_rating_current"] for w in profile["best_wins"]} == {208.0}
-    assert profile["current_rating"] == pytest.approx(208.39)
+    assert profile["rating_current"] == pytest.approx(208.39)
 
 
 def test_unresolved_ratings_are_only_the_ambiguous_days(deep):

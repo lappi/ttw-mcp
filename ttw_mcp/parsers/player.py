@@ -251,7 +251,7 @@ def parse_player_profile(
         "name": name,
         "hand": hand,
         "city": city,
-        "current_rating": parse_number(text_of(rating_node)),
+        "rating_current": parse_number(text_of(rating_node)),
         "rank": parse_int(text_of(rank_node)),
         "summary": summary,
         "periods": periods,
