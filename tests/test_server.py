@@ -310,7 +310,7 @@ def test_tournament_matches_are_collected_from_participants(stub_multi, load_fix
     )
     result = server.get_tournament_matches("6ad412a")
     assert result["date"] == "2026-09-13"
-    assert result["participants"] == 17
+    assert result["participants_count"] == 17
     assert all(m["date"] == "2026-09-13" for m in result["matches"])
     # Девять матчей у каждого из двух собранных профилей, один общий.
     assert len(result["matches"]) == 17

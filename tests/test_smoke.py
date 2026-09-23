@@ -49,6 +49,6 @@ def test_live_tournament_matches_still_reconstruct(client):
 
     server._client = client
     result = server.get_tournament_matches("79a8c89")
-    assert result["participants"] == 9
+    assert result["participants_count"] == 9
     assert result["matches"], "матчи собрались хотя бы у части участников"
     assert all(m["date"] == result["date"] for m in result["matches"])

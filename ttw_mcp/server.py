@@ -529,7 +529,7 @@ def get_tournament_matches(tournament_id: str) -> dict:
         "tournament_id": tournament_id,
         "title": tournament["title"],
         "date": date,
-        "participants": tournament["participants_count"],
+        "participants_count": tournament["participants_count"],
         "matches": matches,
         "missing_profiles": missing,
     }
