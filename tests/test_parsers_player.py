@@ -130,6 +130,15 @@ def test_veteran_best_wins_parsed(veteran):
     assert best["delta"] == pytest.approx(4.60)
 
 
+def test_best_wins_player_rating_is_rounded_not_truncated(load_fixture):
+    # Три профиля с дробной частью меньше половины не различают округление
+    # и усечение. Различает только этот: 70.94 на странице против 71 в
+    # блоке лучших побед.
+    profile = parse_player_profile(load_fixture("player_participant.html"), "17828c3")
+    assert profile["current_rating"] == pytest.approx(70.94)
+    assert {w["player_rating_current"] for w in profile["best_wins"]} == {71.0}
+
+
 def test_the_two_fixtures_agree_about_their_shared_match(novice, veteran):
     # novice (1c18ed8) проиграл veteran (66f1645) 0:2; у veteran та же игра 2:0.
     theirs = [m for m in veteran["matches"] if m["opponent_id"] == "1c18ed8"][0]
