@@ -7,6 +7,7 @@
 import functools
 import re
 from datetime import date, datetime, timedelta
+from importlib.metadata import version
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
@@ -21,7 +22,9 @@ from ttw_mcp.parsers.tournament import parse_tournament
 from ttw_mcp.rating import annotate_matches, rating_at_event
 from ttw_mcp.reconcile import reconcile_matches
 
-mcp = MCPServer("ttw")
+# Версия берётся из метаданных пакета, а не дублируется строкой: иначе
+# она разъедется с pyproject, и клиент покажет неверную в своём /mcp.
+mcp = MCPServer("ttw", version=version("ttw-mcp"))
 _client = TtwClient()
 
 # fullmatch без якорей, а не match с "$": в Python "$" совпадает и перед

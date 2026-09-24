@@ -1,5 +1,6 @@
 import asyncio
 import re
+from importlib.metadata import version
 
 import pytest
 from mcp.server.mcpserver.exceptions import ToolError, UnexpectedToolError
@@ -626,3 +627,10 @@ def test_range_with_enrich_over_the_cap_is_refused(monkeypatch):
         "get_tournaments_by_name:01.09.2026",
         "get_tournaments_by_name:02.09.2026",
     ]
+
+
+def test_server_reports_its_version():
+    # Клиент показывает версию в своём /mcp. Пустая строка там выглядит как
+    # сломанная сборка, а захардкоженная разъезжается с pyproject.
+    assert server.mcp.version == version("ttw-mcp")
+    assert server.mcp.version
