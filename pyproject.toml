@@ -18,6 +18,7 @@ Repository = "https://github.com/lappi/ttw-mcp"
 
 [project.scripts]
 ttw-mcp = "ttw_mcp.server:main"
+ttw-mcp-http = "ttw_mcp.http:main"
 
 [dependency-groups]
 dev = ["pytest>=8.0"]
