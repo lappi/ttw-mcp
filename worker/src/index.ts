@@ -13,7 +13,7 @@ interface Env {
 
 const BASE_URL = "https://r.ttw.ru";
 const USER_AGENT = "ttw-mcp/0.1 (+https://github.com/lappi/ttw-mcp)";
-const TIMEOUT_MS = 30_000;
+const TIMEOUT_MS = 120_000;
 const SERVER_INFO = { name: "ttw", version: "0.0.1-worker" };
 const PROTOCOLS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 
@@ -55,9 +55,11 @@ async function searchPlayers(args: Json): Promise<{ result: SearchResult; upstre
     headers: { "User-Agent": USER_AGENT },
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
-  const upstreamMs = Date.now() - started;
+  const headersMs = Date.now() - started;
+  console.log(JSON.stringify({ tool: "search_players", headers_ms: headersMs, length: response.headers.get("content-length") }));
   if (!response.ok) throw new UpstreamError(`${url}: HTTP ${response.status}`);
   const result = await parsePlayerSearch(response, limit);
+  const upstreamMs = Date.now() - started;
   console.log(JSON.stringify({ tool: "search_players", upstream_ms: upstreamMs, found: result.total_found }));
   return { result, upstreamMs };
 }
