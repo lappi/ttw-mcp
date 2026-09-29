@@ -1,0 +1,10 @@
+# MVP: один инструмент search_players поверх HTMLRewriter — замер CPU
+# на настоящем воркере. Только workers.dev: маршрутов на lappi.dev нет.
+name = "ttw-mcp"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+workers_dev = true
+
+# Workers Logs: CPU и wall time каждого вызова видны в панели.
+[observability]
+enabled = true
