@@ -7,6 +7,10 @@
 Доступ закрыт токеном из переменной окружения TTW_MCP_TOKEN: открытый адрес
 был бы прокси к сайту, который просит не обходить себя автоматически. Без
 токена процесс не стартует.
+
+Токен принимается в Authorization: Bearer или в X-Api-Key. Второй нужен
+Yandex Serverless Containers: их шлюз считает любой Authorization своим
+IAM-токеном и отвечает 403, не пропуская запрос в контейнер.
 """
 
 import hmac
@@ -19,17 +23,20 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from ttw_mcp.server import mcp
 
 
-class BearerGate:
-    """Пропускает только запросы с Authorization: Bearer <токен>."""
+class TokenGate:
+    """Пропускает только запросы с токеном в Authorization или X-Api-Key."""
 
     def __init__(self, app: ASGIApp, token: str) -> None:
         self._app = app
-        self._expected = f"Bearer {token}".encode()
+        self._bearer = f"Bearer {token}".encode()
+        self._key = token.encode()
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] == "http":
-            given = dict(scope["headers"]).get(b"authorization", b"")
-            if not hmac.compare_digest(given, self._expected):
+            headers = dict(scope["headers"])
+            bearer = hmac.compare_digest(headers.get(b"authorization", b""), self._bearer)
+            key = hmac.compare_digest(headers.get(b"x-api-key", b""), self._key)
+            if not (bearer or key):
                 await send(
                     {
                         "type": "http.response.start",
@@ -53,7 +60,7 @@ def app() -> ASGIApp:
         # чужом домене она только отвергала бы настоящие запросы.
         transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
     )
-    return BearerGate(inner, token)
+    return TokenGate(inner, token)
 
 
 def main() -> None:
