@@ -46,6 +46,19 @@ class TokenGate:
                 )
                 await send({"type": "http.response.body", "body": b"unauthorized"})
                 return
+            # Потока уведомлений от сервера нет: без состояния слать в него
+            # нечего. SDK всё равно держит GET открытым, и клиенты вроде
+            # mcp-remote ждут на нём вечно. Спецификация разрешает 405.
+            if scope["method"] == "GET":
+                await send(
+                    {
+                        "type": "http.response.start",
+                        "status": 405,
+                        "headers": [(b"allow", b"POST")],
+                    }
+                )
+                await send({"type": "http.response.body", "body": b""})
+                return
         await self._app(scope, receive, send)
 
 
